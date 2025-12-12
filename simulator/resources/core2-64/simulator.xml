@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<root name="FrameworkManager">
+  <TabWidget name="Main_TabWidget">
+    <Tab name="ugv_0">
+      <TabWidget name="tabs">
+        <Tab name="sampling">
+          <DoubleSpinBox name="Tech (s):" value="0.01"/>
+        </Tab>
+        <Tab name="optitrack">
+          <CheckBox name="enabled" value="1"/>
+        </Tab>
+        <Tab name="init">
+          <Vector3DSpinBox name="position" value_x="2" value_y="0" value_z="-1"/>
+          <SpinBox name="yaw (deg):" value="90"/>
+        </Tab>
+        <Tab name="model">
+          <DoubleSpinBox name="mass :" value="0.2"/>
+          <DoubleSpinBox name="size (m):" value="0.2"/>
+        <DoubleSpinBox name="translational speed (m/s):" value="2"/><DoubleSpinBox name="rotational speed (deg/s):" value="4"/><DoubleSpinBox name="mass:" value="0.20"/></Tab>
+        <Tab name="visual">
+          <SpinBox name="arm color (R):" value="255"/>
+          <SpinBox name="arm color (G):" value="0"/>
+          <SpinBox name="arm color (B):" value="0"/>
+        </Tab>
+      </TabWidget>
+    </Tab>
+    <Tab name="target">
+      <TabWidget name="tabs">
+        <Tab name="sampling">
+          <DoubleSpinBox name="Tech (s):" value="0.001"/>
+        </Tab>
+        <Tab name="optitrack">
+          <CheckBox name="enabled" value="1"/>
+        </Tab>
+        <Tab name="init">
+          <Vector3DSpinBox name="position" value_x="0" value_y="0" value_z="0"/>
+          <SpinBox name="yaw (deg):" value="0"/>
+        </Tab>
+        <Tab name="model">
+          <DoubleSpinBox name="translational speed (m/s):" value="1.3"/>
+          <DoubleSpinBox name="rotational speed (deg/s):" value="60"/>
+        <DoubleSpinBox name="mass:" value="0"/></Tab>
+      </TabWidget>
+    </Tab>
+  </TabWidget>
+  <PushButton name="save config on target (simulator)" value="1"/>
+</root>

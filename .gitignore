@@ -1,0 +1,4 @@
+# Git ignore file
+
+# Ignore build directories
+build*/
