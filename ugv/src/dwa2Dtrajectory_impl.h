@@ -21,13 +21,13 @@ class dwa2Dtrajectory;
 }
 
 // Structure pour représenter un obstacle ponctuel
-/*struct Obstacle {
+struct Obstacle {
     float x;
     float y;
     float radius;  // rayon de sécurité autour de l'obstacle
     
     Obstacle(float x_, float y_, float r_ = 0.3f) : x(x_), y(y_), radius(r_) {}
-};*/
+};
 
 // Structure pour une trajectoire simulée
 struct SimulatedTrajectory {
