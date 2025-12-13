@@ -272,20 +272,17 @@ void dwa2Dtrajectory_impl::CalcVelocityCommand(float &v_cmd, float &w_cmd) {
     float best_score = -std::numeric_limits<float>::infinity();
     v_cmd = 0.0f;
     w_cmd = 0.0f;
-
-    // Optimisation : Sortir l'objet de la boucle pour éviter re-allocation
-    // Mieux : le mettre en membre de la classe "private"
-    static SimulatedTrajectory traj; 
     
-    // Fenêtre dynamique simple (basée sur v_max pour l'instant)
+    // Start v from dv instead of 0 to force checking moving trajectories
+    // OR allow 0 but ensure scoring favors speed.
     for (float v = 0.0f; v <= params.v_max; v += params.dv) {
         for (float w = -params.w_max; w <= params.w_max; w += params.dw) {
             
-            // Simulation (version optimisée sans resize interne si possible)
-            traj = SimTrajectory(v, w, params.dt, params.T);
+            SimulatedTrajectory traj = SimTrajectory(v, w, params.dt, params.T);
             
             float score = EvaluateTrajectory(traj, v);
             
+            // Prefer higher velocity if scores are very close
             if (score > best_score) {
                 best_score = score;
                 v_cmd = v;
