@@ -17,6 +17,9 @@
 #ifdef GL
 #include <Parser.h>
 #include <Man.h>
+#include <Ball.h>
+#include <vector>  // <--- AJOUTER
+#include <string>  // <--- AJOUTER
 #endif
 
 using namespace TCLAP;
@@ -31,6 +34,7 @@ string media_path;
 string scene_file;
 string name;
 string address;
+
 
 void parseOptions(int argc, char** argv)
 {

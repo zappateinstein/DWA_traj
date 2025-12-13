@@ -76,9 +76,17 @@ dwatraj::dwatraj(string name, TargetController *controller): Thread(getFramework
               << ", " << initial_goal.y << ")\n";
     
     trajectory->ClearObstacles();
-    trajectory->AddObstacle(1.5f, 1.5f, 0.3f);
-    trajectory->AddObstacle(3.0f, 3.5f, 0.4f);
-    trajectory->AddObstacle(0.8f, 4.2f, 0.25f);
+    
+    // Ajout manuel des obstacles (exemple basé sur ta liste)
+    trajectory->AddObstacle(1.0f, 1.0f, 0.3f);
+    trajectory->AddObstacle(2.0f, 1.0f, 0.3f);
+    trajectory->AddObstacle(2.0f, 2.0f, 0.3f);
+    trajectory->AddObstacle(3.0f, 3.0f, 0.3f);
+    trajectory->AddObstacle(3.0f, 2.0f, 0.3f);
+    trajectory->AddObstacle(3.0f, 4.0f, 0.3f);
+    trajectory->AddObstacle(4.0f, 3.0f, 0.3f);
+    trajectory->AddObstacle(4.0f, 4.0f, 0.3f);
+    trajectory->AddObstacle(5.0f, 4.5f, 0.3f);
 
     ugvVrpn->xPlot()->AddCurve(trajectory->GetMatrix()->Element(0,0), DataPlot::Blue);
     ugvVrpn->yPlot()->AddCurve(trajectory->GetMatrix()->Element(0,1), DataPlot::Blue);
