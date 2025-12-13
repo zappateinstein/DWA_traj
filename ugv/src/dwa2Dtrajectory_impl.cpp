@@ -82,7 +82,7 @@ dwa2Dtrajectory_impl::~dwa2Dtrajectory_impl() {
 
 // ========== GESTION DES OBSTACLES ==========
 
-/*void dwa2Dtrajectory_impl::SetObstacles(const std::vector<Obstacle> &obs) {
+void dwa2Dtrajectory_impl::SetObstacles(const std::vector<Obstacle> &obs) {
     obstacles = obs;
     std::cerr << "[DWA] Set " << obstacles.size() << " obstacles\n";
 }
@@ -95,7 +95,7 @@ void dwa2Dtrajectory_impl::AddObstacle(float x, float y, float radius) {
 void dwa2Dtrajectory_impl::ClearObstacles() {
     obstacles.clear();
     std::cerr << "[DWA] Cleared all obstacles\n";
-}*/
+}
 
 // ========== GETTERS/SETTERS ==========
 
@@ -207,7 +207,7 @@ SimulatedTrajectory dwa2Dtrajectory_impl::SimTrajectory(float v, float w,
 
 // ========== DISTANCE MINIMALE AUX OBSTACLES ==========
 
-/*float dwa2Dtrajectory_impl::MinimalDistance(const SimulatedTrajectory &traj) {
+float dwa2Dtrajectory_impl::MinimalDistance(const SimulatedTrajectory &traj) {
     if (obstacles.empty()) {
         return std::numeric_limits<float>::infinity();
     }
@@ -297,7 +297,7 @@ void dwa2Dtrajectory_impl::CalcVelocityCommand(float &v_cmd, float &w_cmd) {
     // Debug: affiche la commande choisie
     std::cerr << "[DWA] Best: v=" << v_cmd << " w=" << w_cmd 
               << " score=" << best_score << "\n";
-}*/
+}
 
 // ========== UPDATE PRINCIPAL ==========
 
@@ -354,26 +354,8 @@ void dwa2Dtrajectory_impl::Update(Time time) {
     } else {
         // ========== Calcul de la commande simple (contrôleur proportionnel) ==========
         // CORRECTION: Calcul de l'angle vers le goal depuis la position ACTUELLE
-        float goal_dir = atan2f(goal_pos.y - pos.y, goal_pos.x - pos.x);
-        
-        // Commande de vitesse proportionnelle à la distance
-        float v_cmd = 0.8f * dist_to_goal;
-        
-        // Limiter la vitesse linéaire à v_max
-        if (v_cmd > params.v_max) {
-            v_cmd = params.v_max;
-        }
-        
-        // Commande de vitesse angulaire proportionnelle à l'erreur d'angle
-        float angle_error = AngDiff(goal_dir, angle_off);
-        float w_cmd = 0.4f * angle_error;
-        
-        // Limiter la vitesse angulaire à w_max
-        if (w_cmd > params.w_max) {
-            w_cmd = params.w_max;
-        } else if (w_cmd < -params.w_max) {
-            w_cmd = -params.w_max;
-        }
+       float v_cmd, w_cmd;
+       CalcVelocityCommand(v_cmd, w_cmd);
         std::cerr << "[DWA] v_cmd=" << v_cmd << " w_cmd=" << w_cmd 
                   << " dist_to_goal=" << dist_to_goal << "\n";
         

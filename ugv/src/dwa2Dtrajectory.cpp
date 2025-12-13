@@ -47,7 +47,7 @@ void dwa2Dtrajectory::StopTraj(void) {
 
 // ========== OBSTACLES ==========
 
-/*void dwa2Dtrajectory::SetObstacles(const std::vector<Obstacle> &obs) {
+void dwa2Dtrajectory::SetObstacles(const std::vector<Obstacle> &obs) {
     pimpl_->SetObstacles(obs);
 }
 
@@ -57,7 +57,7 @@ void dwa2Dtrajectory::AddObstacle(float x, float y, float radius) {
 
 void dwa2Dtrajectory::ClearObstacles() {
     pimpl_->ClearObstacles();
-}*/
+}
 
 // ========== SETTERS/GETTERS ==========
 

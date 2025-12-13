@@ -74,7 +74,12 @@ dwatraj::dwatraj(string name, TargetController *controller): Thread(getFramework
     trajectory->SetEnd(initial_goal);
     std::cerr << "[dwa_path] Initial goal set to (" << initial_goal.x 
               << ", " << initial_goal.y << ")\n";
-              
+    
+    trajectory->ClearObstacles();
+    trajectory->AddObstacle(1.5f, 1.5f, 0.3f);
+    trajectory->AddObstacle(3.0f, 3.5f, 0.4f);
+    trajectory->AddObstacle(0.8f, 4.2f, 0.25f);
+
     ugvVrpn->xPlot()->AddCurve(trajectory->GetMatrix()->Element(0,0), DataPlot::Blue);
     ugvVrpn->yPlot()->AddCurve(trajectory->GetMatrix()->Element(0,1), DataPlot::Blue);
     ugvVrpn->VxPlot()->AddCurve(trajectory->GetMatrix()->Element(1,0), DataPlot::Blue);
@@ -153,11 +158,6 @@ void dwatraj::CheckJoystick(void) {
 void dwatraj::SecurityCheck(void) {
     if ((!vrpnLost) && (behaviourMode == BehaviourMode_t::Auto)) {
         // Warning: if you don't use 'targetVrpn' anymore, you can remove this check
-        /*if (!targetVrpn->IsTracked(500)) {
-            Thread::Err("VRPN, target lost\n");
-            vrpnLost=true;
-            StopTraj();
-        }*/
         if (!ugvVrpn->IsTracked(500)) {
             Thread::Err("VRPN, ugv lost\n");
             vrpnLost = true;
@@ -245,7 +245,7 @@ void dwatraj::StartTraj(void) {
     ugv_pos.To2Dxy(ugv_2Dpos);
     
     // Set Goal
-    Vector2Df goal(2.0f, 3.0f);
+    Vector2Df goal(5.0f, 5.0f);
     trajectory->SetEnd(goal);
     
     // Start DWA from current robot position

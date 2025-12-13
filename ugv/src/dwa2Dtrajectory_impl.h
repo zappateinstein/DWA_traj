@@ -49,9 +49,9 @@ public:
     void StopTraj(void);
 
     // Gestion des obstacles
-    /*void SetObstacles(const std::vector<Obstacle> &obs);
+    void SetObstacles(const std::vector<Obstacle> &obs);
     void AddObstacle(float x, float y, float radius = 0.3f);
-    void ClearObstacles();*/
+    void ClearObstacles();
 
     // offsets applied to outputs
     flair::core::Vector2Df pos_off;   // OFFSET appliqué à la sortie (repère)
@@ -93,16 +93,16 @@ private:
     // ========== MÉTHODES DWA ==========
     
     // Calcule la meilleure commande (v, w) selon DWA
-    //void CalcVelocityCommand(float &v_cmd, float &w_cmd);
+    void CalcVelocityCommand(float &v_cmd, float &w_cmd);
     
     // Simule une trajectoire pour (v, w) donnés
     SimulatedTrajectory SimTrajectory(float v, float w, float dt, float T);
     
     // Calcule la distance minimale aux obstacles pour une trajectoire
-    //float MinimalDistance(const SimulatedTrajectory &traj);
+    float MinimalDistance(const SimulatedTrajectory &traj);
     
     // Fonction de coût pour une trajectoire
-    //float EvaluateTrajectory(const SimulatedTrajectory &traj, float v);
+    float EvaluateTrajectory(const SimulatedTrajectory &traj, float v);
     
     // Différence angulaire normalisée [-π, π]
     float AngDiff(float a, float b);
@@ -124,7 +124,7 @@ private:
     flair::core::Vector2Df end_speed;
 
     // ========== OBSTACLES ==========
-    //std::vector<Obstacle> obstacles;
+    std::vector<Obstacle> obstacles;
     bool have_end;
 
     // ========== UI WIDGETS ==========
