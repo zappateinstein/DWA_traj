@@ -32,6 +32,8 @@
 #include <UgvControls.h>
 #include <math.h>
 #include <iostream>
+#include <string>
+#include <vector>
 
 using namespace std;
 using namespace flair::core;
@@ -41,7 +43,29 @@ using namespace flair::filter;
 using namespace flair::meta;
 using namespace flair::actuator;
 
-// ========== CONSTRUCTOR ==========
+// =========================================================
+// LISTE MANUELLE D'OBSTACLES (IDENTIQUE AU SIMULATEUR)
+// =========================================================
+float obs_coords_ctrl[][2] = {
+    // 1. Un mur vertical en X=1.5 (Force le détour)
+    {1.5f, -1.0f}, {1.5f, 0.0f}, {1.5f, 1.0f}, {1.5f, 2.0f},
+    
+    // 2. Un mur horizontal en Y=3.0 (Barrière du haut)
+    {-1.0f, 3.0f}, {0.0f, 3.0f}, {1.0f, 3.0f},
+    
+    // 3. Un "Goulot" étroit en (3.5, 2.0)
+    {-3.5f, 1.5f}, {3.5f, 3.5f}, 
+    
+    // 4. Protection autour du but (supposé vers 5,5)
+    {4.5f, 4.0f}, {-4.0f, 5.5f},
+    
+    // 5. Obstacles dispersés (Pièges)
+    {2.0f, 2.0f}, {2.0f, 4.0f}, {2.5f, -1.5f}, {5.0f, 0.0f}
+};
+// Nombre d'obstacles
+int nb_obs_ctrl = 15;
+// =========================================================
+
 dwatraj::dwatraj(string name, TargetController *controller): Thread(getFrameworkManager(), "DWA_Controller", 50), behaviourMode(BehaviourMode_t::Manual), vrpnLost(false) {
     this->controller = controller;
     controller->Start();
@@ -70,23 +94,25 @@ dwatraj::dwatraj(string name, TargetController *controller): Thread(getFramework
     std::cerr << "[dwa_path] Initial obstacles configured\n";
 
     // ========== Initial Goal Configuration ==========
-    Vector2Df initial_goal(2.0f, 3.0f);
+    // On met le but à l'opposé pour traverser le champ de mines
+    Vector2Df initial_goal(5.0f, 5.0f);
     trajectory->SetEnd(initial_goal);
     std::cerr << "[dwa_path] Initial goal set to (" << initial_goal.x 
               << ", " << initial_goal.y << ")\n";
     
+    // ========== INJECTION DES OBSTACLES DWA ==========
     trajectory->ClearObstacles();
     
-    // Ajout manuel des obstacles (exemple basé sur ta liste)
-    trajectory->AddObstacle(1.0f, 1.0f, 0.3f);
-    trajectory->AddObstacle(2.0f, 1.0f, 0.3f);
-    trajectory->AddObstacle(2.0f, 2.0f, 0.3f);
-    trajectory->AddObstacle(3.0f, 3.0f, 0.3f);
-    trajectory->AddObstacle(3.0f, 2.0f, 0.3f);
-    trajectory->AddObstacle(3.0f, 4.0f, 0.3f);
-    trajectory->AddObstacle(4.0f, 3.0f, 0.3f);
-    trajectory->AddObstacle(4.0f, 4.0f, 0.3f);
-    trajectory->AddObstacle(5.0f, 4.5f, 0.3f);
+    for(int i = 0; i < nb_obs_ctrl; i++) {
+        float x = obs_coords_ctrl[i][0];
+        float y = obs_coords_ctrl[i][1];
+        
+        // Ajout avec un rayon de sécurité de 0.4m (Ball = 0.3 + Marge)
+        trajectory->AddObstacle(x, y, 0.1f);
+        
+        std::cerr << " [DWA] Obstacle ajouté: (" << x << ", " << y << ")\n";
+    }
+    // =================================================
 
     ugvVrpn->xPlot()->AddCurve(trajectory->GetMatrix()->Element(0,0), DataPlot::Blue);
     ugvVrpn->yPlot()->AddCurve(trajectory->GetMatrix()->Element(0,1), DataPlot::Blue);
@@ -105,7 +131,7 @@ dwatraj::dwatraj(string name, TargetController *controller): Thread(getFramework
     
     getFrameworkManager()->AddDeviceToLog(uX);
     getFrameworkManager()->AddDeviceToLog(uY);
-    
+
     l = new DoubleSpinBox(setupLawTab->NewRow(), "L", " m", 0, 10, 0.1, 1, 1);
     std::cerr << "[dwa_path] Initialization complete\n";
 }
@@ -140,23 +166,18 @@ void dwatraj::CheckPushButton(void) {
     getFrameworkManager()->StopLog();
   
   if (startTraj->Clicked() == true)
-      StartTraj(); // Corrected name
-        
+      StartTraj(); 
   if (stopTraj->Clicked() == true)
-      StopTraj(); // Corrected name
-
+      StopTraj(); 
   if (quitProgram->Clicked() == true)
       SafeStop();
 }
 
 // ========== JOYSTICK CHECK ==========
 void dwatraj::CheckJoystick(void) {
-  // R1 and Start -> Start Trajectory
   if(controller->ButtonClicked(4) && controller->IsButtonPressed(9)) {
       StartTraj();
   }
-
-  // R1 and Cross -> Stop Trajectory
   if(controller->ButtonClicked(5) && controller->IsButtonPressed(9)) {
       StopTraj();
   }
@@ -165,7 +186,6 @@ void dwatraj::CheckJoystick(void) {
 // ========== SECURITY ==========
 void dwatraj::SecurityCheck(void) {
     if ((!vrpnLost) && (behaviourMode == BehaviourMode_t::Auto)) {
-        // Warning: if you don't use 'targetVrpn' anymore, you can remove this check
         if (!ugvVrpn->IsTracked(500)) {
             Thread::Err("VRPN, ugv lost\n");
             vrpnLost = true;
@@ -195,51 +215,39 @@ void dwatraj::ComputeAutoControls(void) {
   ugv_pos.To2Dxy(ugv_2Dpos);
   ugv_vel.To2Dxy(ugv_2Dvel);
   
+  // Note: On n'a plus besoin de mettre à jour les obstacles ici 
+  // car ils sont statiques et déjà chargés dans le constructeur.
+  
   // DWA Update
   trajectory->Update(GetTime());
   trajectory->GetPosition(traj_pos);
   trajectory->GetSpeed(traj_vel);
   trajectory->GetEnd(goal_pos);
 
-  // Error calculation
-  pos_error = ugv_2Dpos - traj_pos; // Warning: Sign might need inversion (traj - ugv) for standard PID
+  pos_error = ugv_2Dpos - traj_pos; 
   vel_error = ugv_2Dvel - traj_vel;
-  
-  // Note: Usually PID error is (Target - Current). 
-  // If your PID gains are positive, you might want (traj_pos - ugv_2Dpos).
-  // I kept your sign logic, assuming your PID or actuator handles it.
   
   uX->SetValues(pos_error.x, vel_error.x);
   uX->Update(GetTime());
   uY->SetValues(pos_error.y, vel_error.y);
   uY->Update(GetTime());
   
-  // Calculate distance to REAL goal
   float real_dist_to_goal = (goal_pos - ugv_2Dpos).GetNorm();
 
-  // Stop Condition
   if (!trajectory->IsRunning() && real_dist_to_goal < 0.1f) {
     std::cout << "[dwa_path] Goal reached (Physics)! Stopping.\n";
     GetUgv()->GetUgvControls()->SetControls(0, 0);
-    std::cerr << "[dwa_path] Started DWA from (" << ugv_2Dpos.x << ", " 
-                  << ugv_2Dpos.y << ") toward goal (" << goal_pos.x << ", " 
-                  << goal_pos.y << ")\n";
     behaviourMode = BehaviourMode_t::Manual;
     return;
   }
 
-  // Get Yaw
   Quaternion vrpnQuaternion;
   ugvVrpn->GetQuaternion(vrpnQuaternion);
   float yaw = vrpnQuaternion.ToEuler().yaw;
   
-  // Control Mix
   float v = cosf(yaw) * uX->Output() + sinf(yaw) * uY->Output();
   float w = -sinf(yaw) / l->Value() * uX->Output() + cosf(yaw) / l->Value() * uY->Output();
-  std::cerr << "[dwa_path] Started DWA from (" << ugv_2Dpos.x << ", " 
-                  << ugv_2Dpos.y << ") toward goal (" << goal_pos.x << ", " 
-                  << goal_pos.y << ")\n";
-  // Send Controls
+  
   GetUgv()->GetUgvControls()->SetControls(-v, -w);
 }
 
@@ -252,11 +260,8 @@ void dwatraj::StartTraj(void) {
     ugvVrpn->GetPosition(ugv_pos);
     ugv_pos.To2Dxy(ugv_2Dpos);
     
-    // Set Goal
-    Vector2Df goal(5.0f, 5.0f);
-    trajectory->SetEnd(goal);
-    
-    // Start DWA from current robot position
+    // Position de départ (ex: -5, -5)
+    // Goal déjà configuré dans le constructeur (5, 5) ou réinitialisez-le ici
     trajectory->StartTraj(ugv_2Dpos);
 
     uX->Reset();
@@ -269,7 +274,7 @@ void dwatraj::StartTraj(void) {
 // ========== STOP TRAJECTORY ==========
 void dwatraj::StopTraj(void) {
   if(behaviourMode == BehaviourMode_t::Auto) {
-    trajectory->FinishTraj(); // Or StopTraj() depending on what you want
+    trajectory->FinishTraj(); 
     behaviourMode = BehaviourMode_t::Manual;
     GetUgv()->GetUgvControls()->SetControls(0, 0);
     Thread::Info("DWA Controller: Stopping Auto Mode\n");

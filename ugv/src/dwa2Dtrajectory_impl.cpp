@@ -33,7 +33,7 @@ dwa2Dtrajectory_impl::dwa2Dtrajectory_impl(
     alpha = new DoubleSpinBox(reglages_groupbox->NewRow(), "alpha (heading)", "", 0.0, 10.0, 0.1, 1.5);
     beta = new DoubleSpinBox(reglages_groupbox->LastRowLastCol(), "beta (velocity)", "", 0.0, 10.0, 0.1, 1.0);
     gamma = new DoubleSpinBox(reglages_groupbox->LastRowLastCol(), "gamma (obstacle)", "", 0.0, 10.0, 0.1, 1.0);
-    epsilon = new DoubleSpinBox(reglages_groupbox->LastRowLastCol(), "epsilon (collision)", " m", 0.0, 1.0, 0.05, 0.1);  // CORRECTION: 3,0.1 -> 0.1
+    epsilon = new DoubleSpinBox(reglages_groupbox->LastRowLastCol(), "epsilon (collision)", " m", 0.0, 1.0, 0.);  // CORRECTION: 3,0.1 -> 0.1
     
     // ========== Matrice de sortie (pos, vel, acc, jerk) ==========
     MatrixDescriptor *desc = new MatrixDescriptor(4, 2);
@@ -64,14 +64,14 @@ dwa2Dtrajectory_impl::dwa2Dtrajectory_impl(
     params.v_max = 1.0f;
     params.w_max = 1.0f;
     params.dt = 0.1f;
-    params.T = 1.0f;
+    params.T = 2.0f;
     params.alpha = 1.5f;
     params.beta = 1.0f;
     params.gamma = 1.0f;
     params.epsilon = 0.1f;
     params.dv = 0.1f;
     params.dw = 0.1f;
-    params.sim_time = 20.0f;
+    params.sim_time = 30.0f;
 
     std::cerr << "[DWA_impl] Initialized successfully\n";
 }
@@ -262,6 +262,13 @@ float dwa2Dtrajectory_impl::EvaluateTrajectory(const SimulatedTrajectory &traj,
     float score = params.alpha * heading + 
                   params.beta * velocity_term + 
                   params.gamma * d_min;
+
+    // --- AJOUT OBLIGATOIRE ---
+    float dist_to_goal = (goal_pos - pos).GetNorm();
+    // Si on n'avance pas alors qu'on est loin du but -> PENALITÉ MORTELLE
+    if (v < 0.05f && dist_to_goal > 0.2f) {
+        score -= 1000.0f; 
+    }
     
     return score;
 }

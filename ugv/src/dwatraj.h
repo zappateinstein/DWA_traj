@@ -52,7 +52,7 @@ class dwatraj : public flair::core::Thread {
         flair::filter::Pid *uX, *uY;
         flair::gui::PushButton *startTraj, *stopTraj, *quitProgram, *startLog, *stopLog;
         flair::gui::DoubleSpinBox *l;
-        flair::meta::MetaVrpnObject *targetVrpn, *ugvVrpn;
+        flair::meta::MetaVrpnObject *targetVrpn, *ugvVrpn, *obstacleVrpn;
         flair::filter::dwa2Dtrajectory *trajectory;
         BehaviourMode_t behaviourMode;
         bool vrpnLost;
