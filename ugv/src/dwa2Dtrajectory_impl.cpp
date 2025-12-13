@@ -336,6 +336,7 @@ void dwa2Dtrajectory_impl::Update(Time time) {
     // ========== Mise à jour des paramètres UI ==========
     params.v_max = velocity->Value();
     params.w_max = angular->Value();
+    std::cerr << "[DWA] vitesse maximale=" << params.v_max <<"vitesse angulaire maximale"<<params.w_max<< "\n";
     params.alpha = alpha->Value();
     params.beta = beta->Value();
     params.gamma = gamma->Value();

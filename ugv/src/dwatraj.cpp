@@ -232,7 +232,7 @@ void dwatraj::ComputeAutoControls(void) {
                   << ugv_2Dpos.y << ") toward goal (" << goal_pos.x << ", " 
                   << goal_pos.y << ")\n";
   // Send Controls
-  GetUgv()->GetUgvControls()->SetControls(-2, -2);
+  GetUgv()->GetUgvControls()->SetControls(-v, -w);
 }
 
 // ========== START TRAJECTORY ==========
