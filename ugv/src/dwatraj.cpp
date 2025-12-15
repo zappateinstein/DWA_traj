@@ -112,6 +112,12 @@ dwatraj::dwatraj(string name, TargetController *controller): Thread(getFramework
         
         std::cerr << " [DWA] Obstacle ajouté: (" << x << ", " << y << ")\n";
     }
+    Vector3Df target_pos;
+    Vector2Df target_2Dpos;
+    ugvVrpn->GetPosition(target_pos);
+
+    target_pos.To2Dxy(target_2Dpos);
+    trajectory->AddObstacle(target_pos.x, target_pos.y, 0.1f);
     // =================================================
 
     ugvVrpn->xPlot()->AddCurve(trajectory->GetMatrix()->Element(0,0), DataPlot::Blue);

@@ -64,7 +64,7 @@ dwa2Dtrajectory_impl::dwa2Dtrajectory_impl(
     params.v_max = 1.0f;
     params.w_max = 1.0f;
     params.dt = 0.1f;
-    params.T = 2.0f;
+    params.T = 1.0f;
     params.alpha = 1.5f;
     params.beta = 1.0f;
     params.gamma = 1.0f;
