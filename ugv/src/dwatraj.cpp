@@ -34,6 +34,13 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <sstream>
+#include <cstring>
 
 using namespace std;
 using namespace flair::core;
@@ -91,13 +98,13 @@ dwatraj::dwatraj(string name, TargetController *controller): Thread(getFramework
     
     trajectory = new dwa2Dtrajectory(vrpnclient->GetLayout()->NewRow(), "Kinematic");
     std::cout << "création du chemin suivi par le robot\n";
-    std::cerr << "[dwa_path] Initial obstacles configured\n";
+    std::cerr << "[DWA_traj] Initial obstacles configured\n";
 
     // ========== Initial Goal Configuration ==========
     // On met le but à l'opposé pour traverser le champ de mines
     Vector2Df initial_goal(5.0f, 5.0f);
     trajectory->SetEnd(initial_goal);
-    std::cerr << "[dwa_path] Initial goal set to (" << initial_goal.x 
+    std::cerr << "[DWA_traj] Initial goal set to (" << initial_goal.x 
               << ", " << initial_goal.y << ")\n";
     
     // ========== INJECTION DES OBSTACLES DWA ==========
@@ -112,19 +119,13 @@ dwatraj::dwatraj(string name, TargetController *controller): Thread(getFramework
         
         std::cerr << " [DWA] Obstacle ajouté: (" << x << ", " << y << ")\n";
     }
-    Vector3Df target_pos;
-    Vector2Df target_2Dpos;
-    ugvVrpn->GetPosition(target_pos);
-
-    target_pos.To2Dxy(target_2Dpos);
-    trajectory->AddObstacle(target_pos.x, target_pos.y, 0.1f);
     // =================================================
 
     ugvVrpn->xPlot()->AddCurve(trajectory->GetMatrix()->Element(0,0), DataPlot::Blue);
     ugvVrpn->yPlot()->AddCurve(trajectory->GetMatrix()->Element(0,1), DataPlot::Blue);
     ugvVrpn->VxPlot()->AddCurve(trajectory->GetMatrix()->Element(1,0), DataPlot::Blue);
     ugvVrpn->VyPlot()->AddCurve(trajectory->GetMatrix()->Element(1,1), DataPlot::Blue);
-    ugvVrpn->XyPlot()->AddCurve(trajectory->GetMatrix()->Element(0,1), trajectory->GetMatrix()->Element(0,0), DataPlot::Blue, "DWA_trajectoryectory");
+    ugvVrpn->XyPlot()->AddCurve(trajectory->GetMatrix()->Element(0,1), trajectory->GetMatrix()->Element(0,0), DataPlot::Blue, "dwa_trajectory");
 
     Tab *lawTab = new Tab(getFrameworkManager()->GetTabWidget(), "control laws");
     TabWidget *tabWidget = new TabWidget(lawTab->NewRow(), "laws");
@@ -139,10 +140,23 @@ dwatraj::dwatraj(string name, TargetController *controller): Thread(getFramework
     getFrameworkManager()->AddDeviceToLog(uY);
 
     l = new DoubleSpinBox(setupLawTab->NewRow(), "L", " m", 0, 10, 0.1, 1, 1);
-    std::cerr << "[dwa_path] Initialization complete\n";
+    std::cerr << "[DWA_traj] Initialization complete\n";
+
+    // Setup UDP
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        perror("socket creation failed");
+    }
+    memset(&gc_addr, 0, sizeof(gc_addr));
+    gc_addr.sin_family = AF_INET;
+    gc_addr.sin_port = htons(9005);
+    gc_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 }
 
 dwatraj::~dwatraj() {
+    if (sockfd >= 0) {
+        close(sockfd);
+    }
 }
 
 void dwatraj::Run(void) {
@@ -160,6 +174,39 @@ void dwatraj::Run(void) {
        
         if(behaviourMode == BehaviourMode_t::Manual) ComputeManualControls();
         if(behaviourMode == BehaviourMode_t::Auto) ComputeAutoControls();
+
+        // --- TELEMETRY (Always send) ---
+        Vector3Df t_ugv_pos, t_ugv_vel;
+        Vector2Df t_ugv_2Dpos, t_ugv_2Dvel;
+        Vector2Df t_goal_pos;
+        
+        ugvVrpn->GetPosition(t_ugv_pos);
+        ugvVrpn->GetSpeed(t_ugv_vel);
+        t_ugv_pos.To2Dxy(t_ugv_2Dpos);
+        t_ugv_vel.To2Dxy(t_ugv_2Dvel);
+        
+        Quaternion t_vrpnQuaternion;
+        ugvVrpn->GetQuaternion(t_vrpnQuaternion);
+        float t_yaw = t_vrpnQuaternion.ToEuler().yaw;
+
+        trajectory->GetEnd(t_goal_pos);
+        
+        std::stringstream ss;
+        // DWA,timestamp,ugv_x,ugv_y,ugv_yaw,ugv_vx,ugv_vy,target_x,target_y,obs_count,[obs_x,obs_y,obs_r...]
+        ss << "DWA," << GetTime() / 1000000000.0 << ",";
+        ss << t_ugv_2Dpos.x << "," << t_ugv_2Dpos.y << "," << t_yaw << ",";
+        ss << t_ugv_2Dvel.x << "," << t_ugv_2Dvel.y << ",";
+        ss << t_goal_pos.x << "," << t_goal_pos.y << ",";
+        
+        ss << nb_obs_ctrl;
+        for(int i=0; i<nb_obs_ctrl; i++) {
+            ss << "," << obs_coords_ctrl[i][0] << "," << obs_coords_ctrl[i][1] << "," << 0.1;
+        }
+
+        std::string msg = ss.str();
+        sendto(sockfd, msg.c_str(), msg.length(), 0, (const struct sockaddr *)&gc_addr, sizeof(gc_addr));
+        // --------------------------------
+
         WaitPeriod();
     }
 }
@@ -241,7 +288,7 @@ void dwatraj::ComputeAutoControls(void) {
   float real_dist_to_goal = (goal_pos - ugv_2Dpos).GetNorm();
 
   if (!trajectory->IsRunning() && real_dist_to_goal < 0.1f) {
-    std::cout << "[dwa_path] Goal reached (Physics)! Stopping.\n";
+    std::cout << "[DWA_traj] Goal reached (Physics)! Stopping.\n";
     GetUgv()->GetUgvControls()->SetControls(0, 0);
     behaviourMode = BehaviourMode_t::Manual;
     return;

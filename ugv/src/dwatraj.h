@@ -8,6 +8,7 @@
 #include <Thread.h>
 #include <Vector2D.h>
 #include <vector>
+#include <netinet/in.h>
 
 namespace flair {
     namespace gui {
@@ -57,6 +58,9 @@ class dwatraj : public flair::core::Thread {
         BehaviourMode_t behaviourMode;
         bool vrpnLost;
         flair::sensor::TargetController *controller;
+
+        int sockfd;
+        struct sockaddr_in gc_addr;
 };
 
 #endif // DWATRAJ_H
