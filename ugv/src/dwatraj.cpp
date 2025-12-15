@@ -125,7 +125,7 @@ dwatraj::dwatraj(string name, TargetController *controller): Thread(getFramework
     ugvVrpn->yPlot()->AddCurve(trajectory->GetMatrix()->Element(0,1), DataPlot::Blue);
     ugvVrpn->VxPlot()->AddCurve(trajectory->GetMatrix()->Element(1,0), DataPlot::Blue);
     ugvVrpn->VyPlot()->AddCurve(trajectory->GetMatrix()->Element(1,1), DataPlot::Blue);
-    ugvVrpn->XyPlot()->AddCurve(trajectory->GetMatrix()->Element(0,1), trajectory->GetMatrix()->Element(0,0), DataPlot::Blue, "dwa_trajectory");
+    ugvVrpn->XyPlot()->AddCurve(trajectory->GetMatrix()->Element(0,1), trajectory->GetMatrix()->Element(0,0), DataPlot::Blue, "DWA_traje");
 
     Tab *lawTab = new Tab(getFrameworkManager()->GetTabWidget(), "control laws");
     TabWidget *tabWidget = new TabWidget(lawTab->NewRow(), "laws");

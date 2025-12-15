@@ -1,5 +1,5 @@
-PROJECT(DWA_trajectory)
-cmake_minimum_required(VERSION 2.8)
+PROJECT(DWA_traje)
+cmake_minimum_required(V    ERSION 2.8)
 include($ENV{FLAIR_ROOT}/flair-src/cmake-modules/GlobalCmakeFlair.cmake)
 
 if("${CMAKE_SYSTEM_PROCESSOR_DEFAULTTUNE}" MATCHES "core2-64")
