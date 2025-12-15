@@ -7,6 +7,7 @@ import signal
 import sys
 import math
 
+#qt.qpa.plugin: Could not find the Qt platform plugin "wayland" in "/home/franck-albert-fonkoua/venv-ardupilot/lib/python3.12/site-packages/cv2/qt/plugins"
 # Configuration
 UDP_IP = "0.0.0.0"
 UDP_PORT = 9005
