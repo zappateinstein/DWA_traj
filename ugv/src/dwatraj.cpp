@@ -300,7 +300,7 @@ void dwatraj::ComputeAutoControls(void) {
   
   float v = cosf(yaw) * uX->Output() + sinf(yaw) * uY->Output();
   float w = -sinf(yaw) / l->Value() * uX->Output() + cosf(yaw) / l->Value() * uY->Output();
-  std::cout << "[DWA_traj] position <"<<ugv_2Dpos.x<<","<<ugv_2Dpos.y<<"> "<<"\n";
+  std::cerr << "[DWA_traj] position <"<<ugv_2Dpos.x<<","<<ugv_2Dpos.y<<"> "<<"\n";
   GetUgv()->GetUgvControls()->SetControls(-v, -w);
 }
 
