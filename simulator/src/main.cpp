@@ -39,24 +39,15 @@ string address;
 // =========================================================
 // LISTE MANUELLE D'OBSTACLES (SCÉNARIO COMPLEXE)
 // =========================================================
-float obs_coords[][2] = {
-    // 1. Un mur vertical en X=1.5 (Force le détour)
-    {1.5f, -1.0f}, {1.5f, 0.0f}, {1.5f, 1.0f}, {1.5f, 2.0f},
-    
-    // 2. Un mur horizontal en Y=3.0 (Barrière du haut)
-    {-1.0f, 3.0f}, {0.0f, 3.0f}, {1.0f, 3.0f},
-    
-    // 3. Un "Goulot" étroit en (3.5, 2.0)
-    {-3.5f, 1.5f}, {3.5f, 3.5f}, 
-    
-    // 4. Protection autour du but (supposé vers 5,5)
-    {4.5f, 4.0f}, {-4.0f, 5.5f},
-    
-    // 5. Obstacles dispersés (Pièges)
-    {2.0f, 2.0f}, {2.0f, 4.0f}, {2.5f, -1.5f}, {5.0f, 0.0f}
+float obs_coords_ctrl[][2] = {
+    {-4.2f, -3.8f}, {-3.5f, -1.2f}, {-4.0f, 2.1f}, {-2.8f, -4.3f}, {-1.5f, -2.9f},
+    {-2.2f, 0.5f}, {-3.1f, 3.7f}, {-0.8f, -4.5f}, {-1.0f, 1.8f}, {-0.3f, 4.2f},
+    {0.5f, -3.5f}, {1.2f, -1.0f}, {0.8f, 2.5f}, {1.9f, 4.8f}, {2.5f, -4.2f},
+    {3.2f, -2.1f}, {2.8f, 0.8f}, {3.9f, 3.2f}, {4.5f, -3.9f}, {4.1f, -0.5f},
+    {4.8f, 2.9f}, {-1.8f, 4.5f}, {1.5f, -0.2f}, {-4.7f, 1.0f}, {3.5f, 4.5f}
 };
 // Nombre total d'obstacles dans la liste ci-dessus
-int nb_obs = 15; 
+int nb_obs = 25; 
 // =========================================================
 
 void parseOptions(int argc, char** argv) {
