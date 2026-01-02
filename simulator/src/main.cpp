@@ -90,7 +90,6 @@ int main(int argc, char* argv[]) {
   Model* robot;
 #ifdef GL
   Parser* gui;
-  Man* man;
 #endif
 
   parseOptions(argc, argv);
@@ -106,8 +105,6 @@ int main(int argc, char* argv[]) {
   robot = new TwoWheelRobot(name, 0);
 
 #ifdef GL
-  man = new Man("target", 1);
-
   // CRÉATION DES BALLES DANS LE SIMULATEUR
   for(int i = 0; i < nb_obs; i++) {
       std::stringstream ss;
