@@ -302,7 +302,11 @@ void dwatraj::StartTraj(void) {
     Vector2Df ugv_2Dpos;
 
     ugvVrpn->GetPosition(ugv_pos);
+     std::cerr << "[DEBUG] VRPN 3D pos: (" << ugv_pos.x << ", " 
+          << ugv_pos.y << ", " << ugv_pos.z << ")\n";
     ugv_pos.To2Dxy(ugv_2Dpos);
+    std::cerr << "[DEBUG] VRPN 2D pos: (" << ugv_2Dpos.x << ", " 
+          << ugv_2Dpos.y << ")\n";
     
     // Position de départ (ex: -5, -5)
     // Goal déjà configuré dans le constructeur (5, 5) ou réinitialisez-le ici
