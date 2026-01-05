@@ -93,7 +93,7 @@ dwatraj::dwatraj(string name, TargetController *controller): Thread(getFramework
 
     // ========== Initial Goal Configuration ==========
     // On met le but à l'opposé pour traverser le champ de mines
-    Vector2Df initial_goal(-5.0f, -5.0f);
+    Vector2Df initial_goal(5.0f, 5.0f);
     trajectory->SetEnd(initial_goal);
     std::cerr << "[DWA_traj] Initial goal set to (" << initial_goal.x 
               << ", " << initial_goal.y << ")\n";

@@ -1,155 +1,100 @@
 import socket
-import cv2
-import numpy as np
-import time
-from collections import deque
-import signal
-import sys
-import math
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from matplotlib.animation import FuncAnimation
 
-#qt.qpa.plugin: Could not find the Qt platform plugin "wayland" in "/home/franck-albert-fonkoua/venv-ardupilot/lib/python3.12/site-packages/cv2/qt/plugins"
-# Configuration
-UDP_IP = "0.0.0.0"
+# --- CONFIGURATION RESEAU ---
+UDP_IP = "127.0.0.1"
 UDP_PORT = 9005
-BUFFER_SIZE = 65535
 
-# Map Configuration
-MAP_SIZE = 800  # pixels
-MAP_SCALE = 50  # pixels per meter
-MAP_CENTER_X = MAP_SIZE // 2
-MAP_CENTER_Y = MAP_SIZE // 2
-
-# Data storage
-ugv_path = deque(maxlen=1000)
-ugv_pos = (0, 0)
-ugv_yaw = 0.0
-target_pos = (0, 0)
-obstacles = []
-
-# Setup UDP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 sock.bind((UDP_IP, UDP_PORT))
 sock.setblocking(False)
 
-print(f"Listening on {UDP_IP}:{UDP_PORT}")
+print(f"En écoute sur {UDP_IP}:{UDP_PORT}...")
 
-def signal_handler(sig, frame):
-    print('Exiting...')
-    sock.close()
-    cv2.destroyAllWindows()
-    sys.exit(0)
+# --- MISE EN PLACE DU GRAPHIQUE ---
+fig, ax = plt.subplots(figsize=(8, 8))
+ax.set_xlim(-6, 6)
+ax.set_ylim(-6, 6)
+ax.grid(True)
+ax.set_title("Visualisation DWA en Temps Réel")
 
-signal.signal(signal.SIGINT, signal_handler)
+# Création des objets graphiques vides
+robot_dot, = ax.plot([], [], 'ro', markersize=8, label='Robot')
+goal_dot, = ax.plot([], [], 'gx', markersize=10, markeredgewidth=3, label='But')
+path_traj, = ax.plot([], [], 'b-', alpha=0.5, label='Trajectoire')
 
-def world_to_map(x, y):
-    # World X -> Map X (right)
-    # World Y -> Map Y (up) - so we invert Y for screen coords
-    px = int(MAP_CENTER_X + x * MAP_SCALE)
-    py = int(MAP_CENTER_Y - y * MAP_SCALE)
-    return (px, py)
+# Mémoire
+history_x = []
+history_y = []
+obstacles_list = []
 
-def draw_map():
-    # Create white background
-    map_img = np.ones((MAP_SIZE, MAP_SIZE, 3), dtype=np.uint8) * 255
-
-    # Draw grid
-    grid_color = (220, 220, 220)
-    axis_color = (150, 150, 150)
-    
-    # Grid lines every 1 meter
-    for i in range(-10, 11):
-        p1 = world_to_map(i, -10)
-        p2 = world_to_map(i, 10)
-        cv2.line(map_img, p1, p2, grid_color, 1)
-        
-        p1 = world_to_map(-10, i)
-        p2 = world_to_map(10, i)
-        cv2.line(map_img, p1, p2, grid_color, 1)
-
-    # Axes
-    origin = world_to_map(0, 0)
-    cv2.line(map_img, (0, origin[1]), (MAP_SIZE, origin[1]), axis_color, 2) # X axis
-    cv2.line(map_img, (origin[0], 0), (origin[0], MAP_SIZE), axis_color, 2) # Y axis
-
-    # Draw Obstacles
-    for obs in obstacles:
-        ox, oy, orad = obs
-        pt = world_to_map(ox, oy)
-        rad_px = int(orad * MAP_SCALE)
-        cv2.circle(map_img, pt, rad_px, (0, 0, 0), -1) # Black filled circle
-
-    # Draw UGV path
-    if len(ugv_path) > 1:
-        pts = [world_to_map(p[0], p[1]) for p in ugv_path]
-        cv2.polylines(map_img, [np.array(pts)], False, (255, 0, 0), 2)
-
-    # Draw Target
-    target_pt = world_to_map(target_pos[0], target_pos[1])
-    cv2.drawMarker(map_img, target_pt, (0, 0, 255), cv2.MARKER_CROSS, 15, 3)
-    cv2.putText(map_img, "Target", (target_pt[0]+10, target_pt[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
-
-    # Draw UGV
-    ugv_pt = world_to_map(ugv_pos[0], ugv_pos[1])
-    
-    # Draw UGV orientation
-    arrow_len = 20
-    end_x = int(ugv_pt[0] + arrow_len * math.cos(ugv_yaw))
-    end_y = int(ugv_pt[1] - arrow_len * math.sin(ugv_yaw)) # Y inverted
-    cv2.arrowedLine(map_img, ugv_pt, (end_x, end_y), (255, 0, 0), 2, tipLength=0.3)
-    cv2.circle(map_img, ugv_pt, 6, (255, 0, 0), -1)
-    
-    cv2.putText(map_img, f"Pos: ({ugv_pos[0]:.2f}, {ugv_pos[1]:.2f})", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
-
-    cv2.imshow("DWA Trajectory", map_img)
-
-def main():
-    global ugv_pos, ugv_yaw, target_pos, obstacles
-
-    cv2.namedWindow("DWA Trajectory")
-
-    while True:
-        # Process all pending UDP packets
+def update(frame):
+    # 1. On récupère la DERNIÈRE donnée (on vide le buffer)
+    try:
+        data = None
         while True:
             try:
-                data, addr = sock.recvfrom(BUFFER_SIZE)
-                text = data.decode('utf-8')
-                
-                parts = text.split(',')
-                # DWA,timestamp,ugv_x,ugv_y,ugv_yaw,ugv_vx,ugv_vy,target_x,target_y,obs_count,[obs_x,obs_y,obs_r...]
-                
-                if parts[0] == "DWA" and len(parts) >= 10:
-                    ugv_pos = (float(parts[2]), float(parts[3]))
-                    ugv_yaw = float(parts[4])
-                    target_pos = (float(parts[7]), float(parts[8]))
-                    
-                    ugv_path.append(ugv_pos)
-                    
-                    obs_count = int(parts[9])
-                    
-                    # Parse obstacles
-                    if obs_count > 0:
-                        new_obstacles = []
-                        idx = 10
-                        for _ in range(obs_count):
-                             if idx + 2 >= len(parts): break
-                             ox = float(parts[idx])
-                             oy = float(parts[idx+1])
-                             orad = float(parts[idx+2])
-                             new_obstacles.append((ox, oy, orad))
-                             idx += 3
-                        obstacles = new_obstacles
-
+                # On lit tant qu'il y a des paquets
+                packet, _ = sock.recvfrom(4096)
+                data = packet
             except BlockingIOError:
+                # Plus rien à lire, on sort de la boucle
                 break
-            except Exception as e:
-                print(f"Packet error: {e}")
-                break
-
-        draw_map()
         
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+        # 2. Si on n'a rien reçu du tout dans ce tour, on ne fait rien
+        if data is None:
+            return robot_dot, goal_dot, path_traj
 
-if __name__ == "__main__":
-    main()
+        # 3. Traitement du dernier message reçu
+        msg = data.decode('utf-8')
+        parts = msg.split(',')
+
+        if parts[0] == "DWA":
+            # --- ROBOT ---
+            rx = float(parts[2])
+            ry = float(parts[3])
+            robot_dot.set_data([rx], [ry])
+            
+            # Trace
+            history_x.append(rx)
+            history_y.append(ry)
+            path_traj.set_data(history_x, history_y)
+
+            # --- BUT / GOAL ---
+            gx = float(parts[7])
+            gy = float(parts[8])
+            goal_dot.set_data([gx], [gy])
+
+            # --- OBSTACLES ---
+            global obstacles_list
+            # Effacer les anciens
+            for obs in obstacles_list:
+                obs.remove()
+            obstacles_list = []
+
+            # Recréer les nouveaux
+            nb_obs = int(parts[9])
+            for i in range(nb_obs):
+                idx = 10 + (i * 3)
+                ox = float(parts[idx])
+                oy = float(parts[idx + 1])
+                r  = float(parts[idx + 2])
+                
+                # Création cercle (gris avec bord noir)
+                c = patches.Circle((ox, oy), r, fc='gray', ec='black', alpha=0.5)
+                ax.add_patch(c)
+                obstacles_list.append(c)
+
+    except Exception as e:
+        print(f"Erreur: {e}")
+
+    return robot_dot, goal_dot, path_traj
+
+# --- LANCEMENT DE L'ANIMATION ---
+# interval=50 veut dire qu'on rafraîchit l'image toutes les 50ms
+ani = FuncAnimation(fig, update, interval=50, blit=False)
+
+# Affichage final
+plt.show()
