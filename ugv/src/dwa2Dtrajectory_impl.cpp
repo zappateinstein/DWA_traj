@@ -33,7 +33,7 @@ dwa2Dtrajectory_impl::dwa2Dtrajectory_impl(
     alpha = new DoubleSpinBox(reglages_groupbox->NewRow(), "alpha (heading)", "", 0.0, 10.0, 0.1, 1.5);
     beta = new DoubleSpinBox(reglages_groupbox->LastRowLastCol(), "beta (velocity)", "", 0.0, 10.0, 0.1, 1.0);
     gamma = new DoubleSpinBox(reglages_groupbox->LastRowLastCol(), "gamma (obstacle)", "", 0.0, 10.0, 0.1, 1.0);
-    epsilon = new DoubleSpinBox(reglages_groupbox->LastRowLastCol(), "epsilon (collision)", " m", 0.0, 1.0, 0.);  // CORRECTION: 3,0.1 -> 0.1
+    epsilon = new DoubleSpinBox(reglages_groupbox->LastRowLastCol(), "epsilon (collision)", " m", 0.0, 1.0, 0.01, 2, 0.1);  // CORRECTION: 3,0.1 -> 0.1
     
     // ========== Matrice de sortie (pos, vel, acc, jerk) ==========
     MatrixDescriptor *desc = new MatrixDescriptor(4, 2);
@@ -69,8 +69,8 @@ dwa2Dtrajectory_impl::dwa2Dtrajectory_impl(
     params.beta = 1.0f;
     params.gamma = 1.0f;
     params.epsilon = 0.1f;
-    params.dv = 0.1f;
-    params.dw = 0.1f;
+    params.dv = 0.05f;
+    params.dw = 0.05f;
     params.sim_time = 30.0f;
 
     std::cerr << "[DWA_impl] Initialized successfully\n";
