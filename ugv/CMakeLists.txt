@@ -1,4 +1,4 @@
-PROJECT(DWA_traj1_ugv)
+PROJECT(conavigation_ugv)
 cmake_minimum_required(VERSION 2.8)
 
 SET(FLAIR_USE_FILTER TRUE)
@@ -16,6 +16,6 @@ SET(SRC_FILES
 )
 
 FLAIR_DEMO(${PROJECT_NAME} "${SRC_FILES}"
-           DEST_DIR DWA_traj1
+           DEST_DIR conavigation
            COPY_RESOURCES
 )

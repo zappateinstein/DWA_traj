@@ -4,20 +4,5 @@
   "files.exclude": {
     "**/.git": true,
     "build": true
-  },
-  "ROS2.distro": "jazzy",
-  "python.autoComplete.extraPaths": [
-    "/home/franck-albert-fonkoua/ros2_ws/install/turtlesim_catch_them_all/lib/python3.12/site-packages",
-    "/home/franck-albert-fonkoua/ros2_ws/install/my_py_pkg/lib/python3.12/site-packages",
-    "/home/franck-albert-fonkoua/ros2_ws/install/my_robot_interfaces/lib/python3.12/site-packages",
-    "/home/franck-albert-fonkoua/ros2_ws/install/led_interfaces/lib/python3.12/site-packages",
-    "/opt/ros/jazzy/lib/python3.12/site-packages"
-  ],
-  "python.analysis.extraPaths": [
-    "/home/franck-albert-fonkoua/ros2_ws/install/turtlesim_catch_them_all/lib/python3.12/site-packages",
-    "/home/franck-albert-fonkoua/ros2_ws/install/my_py_pkg/lib/python3.12/site-packages",
-    "/home/franck-albert-fonkoua/ros2_ws/install/my_robot_interfaces/lib/python3.12/site-packages",
-    "/home/franck-albert-fonkoua/ros2_ws/install/led_interfaces/lib/python3.12/site-packages",
-    "/opt/ros/jazzy/lib/python3.12/site-packages"
-  ]
+  }
 }
