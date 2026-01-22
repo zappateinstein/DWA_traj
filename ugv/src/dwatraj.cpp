@@ -54,14 +54,10 @@ using namespace flair::actuator;
 // LISTE MANUELLE D'OBSTACLES (IDENTIQUE AU SIMULATEUR)
 // =========================================================
 float obs_coords_ctrl[][2] = {
-    {-4.2f, -3.8f}, {-3.5f, -1.2f}, {-4.0f, 2.1f}, {-2.8f, -4.3f}, {-1.5f, -2.9f},
-    {-2.2f, 0.5f}, {-3.1f, 3.7f}, {-0.8f, -4.5f}, {-1.0f, 1.8f}, {-0.3f, 4.2f},
-    {0.5f, -3.5f}, {1.2f, -1.0f}, {0.8f, 2.5f}, {1.9f, 4.8f}, {2.5f, -4.2f},
-    {3.2f, -2.1f}, {2.8f, 0.8f}, {3.9f, 3.2f}, {4.5f, -3.9f}, {4.1f, -0.5f},
-    {4.8f, 2.9f}, {-1.8f, 4.5f}, {1.5f, -0.2f}, {-4.7f, 1.0f}, {3.5f, 4.5f}
+    {-4.2f, -3.8f}
 };
 // Nombre d'obstacles
-int nb_obs_ctrl = 25;
+int nb_obs_ctrl = 1;
 // =========================================================
 
 dwatraj::dwatraj(string name, TargetController *controller): Thread(getFrameworkManager(), "DWA_Controller", 50), behaviourMode(BehaviourMode_t::Manual), vrpnLost(false) {
@@ -93,7 +89,7 @@ dwatraj::dwatraj(string name, TargetController *controller): Thread(getFramework
 
     // ========== Initial Goal Configuration ==========
     // On met le but à l'opposé pour traverser le champ de mines
-    Vector2Df initial_goal(5.0f, 5.2f);
+    Vector2Df initial_goal;
     trajectory->SetEnd(initial_goal);
     std::cerr << "[DWA_traj] Initial goal set to (" << initial_goal.x 
               << ", " << initial_goal.y << ")\n";

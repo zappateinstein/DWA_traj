@@ -56,7 +56,9 @@ dwa2Dtrajectory_impl::dwa2Dtrajectory_impl(
     acc = Vector2Df(0, 0);
     jerk = Vector2Df(0, 0);
     end_speed = Vector2Df(0, 0);
-    goal_pos = Vector2Df(0, 0);   // goal par défaut à l'origine
+    goal_pos = Vector2Df(0, 0);
+    goal_pos.x = finalpositionx ->Value();
+    goal_pos.y = finalpositiony ->Value();
     pos_off = Vector2Df(0, 0);    // pas d'offset par défaut
     vel_off = Vector2Df(0, 0);
     angle_off = 0.0f;

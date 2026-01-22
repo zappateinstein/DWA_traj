@@ -126,6 +126,7 @@ public:
      */
     bool IsRunning(void) const;
 
+
 private:
     void UpdateFrom(const core::io_data *data) override {}
 

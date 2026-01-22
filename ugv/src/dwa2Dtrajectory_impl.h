@@ -88,7 +88,6 @@ public:
         float dw;         // incrément vitesse angulaire
         float sim_time;   // temps total de simulation
     } params;
-
 private:
     // ========== MÉTHODES DWA ==========
     
