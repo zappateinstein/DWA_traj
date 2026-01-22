@@ -135,6 +135,8 @@ private:
     flair::gui::DoubleSpinBox *beta;      // poids vitesse
     flair::gui::DoubleSpinBox *gamma;     // poids obstacle
     flair::gui::DoubleSpinBox *epsilon;   // seuil collision
+    flair::gui::DoubleSpinBox *finalpositionx; // position finale x
+    flair::gui::DoubleSpinBox *finalpositiony; // position finale y
 };
 
 #endif // DWA2DTRAJECTORY_IMPL_H

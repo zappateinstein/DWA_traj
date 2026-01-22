@@ -34,6 +34,8 @@ dwa2Dtrajectory_impl::dwa2Dtrajectory_impl(
     beta = new DoubleSpinBox(reglages_groupbox->LastRowLastCol(), "beta (velocity)", "", 0.0, 10.0, 0.1, 1.0);
     gamma = new DoubleSpinBox(reglages_groupbox->LastRowLastCol(), "gamma (obstacle)", "", 0.0, 10.0, 0.1, 1.0);
     epsilon = new DoubleSpinBox(reglages_groupbox->LastRowLastCol(), "epsilon (collision)", " m", 0.0, 1.0, 0.01, 2, 0.1);  // CORRECTION: 3,0.1 -> 0.1
+    finalpositionx = new DoubleSpinBox (reglages_groupbox->LastRowLastCol(), "final position x", " m", 0, 5.0, 0.1);
+    finalpositiony = new DoubleSpinBox (reglages_groupbox->LastRowLastCol(), "final position y", " m", 0, 5.0, 0.1);
     
     // ========== Matrice de sortie (pos, vel, acc, jerk) ==========
     MatrixDescriptor *desc = new MatrixDescriptor(4, 2);
