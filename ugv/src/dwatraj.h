@@ -64,6 +64,8 @@ class dwatraj : public flair::core::Thread {
         int sockfd;
         struct sockaddr_in gc_addr;
         struct sockaddr_in python_addr;  // Pour le script Python
+        bool obstacles_initialized;  // Flag pour savoir si les obstacles ont été initialisés
+        int init_send_counter;  // Compteur pour limiter l'envoi des messages INIT
 };
 
 #endif // DWATRAJ_H

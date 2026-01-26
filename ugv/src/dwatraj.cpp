@@ -59,82 +59,85 @@ float obs_coords_ctrl[][2] = {
 };
 
 dwatraj::dwatraj(string name, TargetController *controller): Thread(getFrameworkManager(), "DWA_Controller", 50), behaviourMode(BehaviourMode_t::Manual), vrpnLost(false) {
-    this->controller = controller;
-    controller->Start();
+  this->controller = controller;
+  controller->Start();
     
-    Ugv* ugv = GetUgv();
-    ugv->UseDefaultPlot();
+  Ugv* ugv = GetUgv();
+  ugv->UseDefaultPlot();
     
-    VrpnClient* vrpnclient = new VrpnClient("vrpn", ugv->GetDefaultVrpnAddress(), 80);
-    trajectory = new dwa2Dtrajectory(vrpnclient->GetLayout()->NewRow(), "Kinematic");
+  VrpnClient* vrpnclient = new VrpnClient("vrpn", ugv->GetDefaultVrpnAddress(), 80);
+  trajectory = new dwa2Dtrajectory(vrpnclient->GetLayout()->NewRow(), "Kinematic");
     
-    // Créer les objets VRPN AVANT de les logger
-    ugvVrpn = new MetaVrpnObject(name);
-    targetVrpn = new MetaVrpnObject("target");
+  // Créer les objets VRPN AVANT de les logger
+  ugvVrpn = new MetaVrpnObject(name);
+  targetVrpn = new MetaVrpnObject("target");
     
-    getFrameworkManager()->AddDeviceToLog(ugvVrpn);
-    getFrameworkManager()->AddDeviceToLog(targetVrpn);
-    vrpnclient->Start();
+  getFrameworkManager()->AddDeviceToLog(ugvVrpn);
+  getFrameworkManager()->AddDeviceToLog(targetVrpn);
+  vrpnclient->Start();
   
-    Tab *ugvTab = new Tab(getFrameworkManager()->GetTabWidget(), "ugv", 0);
-    GridLayout* buttonslayout = new GridLayout(ugvTab->NewRow(), "buttons");
-    quitProgram = new PushButton(buttonslayout->NewRow(), "quit program");
-    startTraj = new PushButton(buttonslayout->NewRow(), "start_traj");
-    stopTraj = new PushButton(buttonslayout->LastRowLastCol(), "stop_traj");
-    startLog = new PushButton(buttonslayout->NewRow(), "start_log");
-    stopLog = new PushButton(buttonslayout->LastRowLastCol(), "stop_log");
-    Obstacles = new PushButton(buttonslayout->NewRow(), "init_obstacles");
+  Tab *ugvTab = new Tab(getFrameworkManager()->GetTabWidget(), "ugv", 0);
+  GridLayout* buttonslayout = new GridLayout(ugvTab->NewRow(), "buttons");
+  quitProgram = new PushButton(buttonslayout->NewRow(), "quit program");
+  startTraj = new PushButton(buttonslayout->NewRow(), "start_traj");
+  stopTraj = new PushButton(buttonslayout->LastRowLastCol(), "stop_traj");
+  startLog = new PushButton(buttonslayout->NewRow(), "start_log");
+  stopLog = new PushButton(buttonslayout->LastRowLastCol(), "stop_log");
+  Obstacles = new PushButton(buttonslayout->NewRow(), "init_obstacles");
 
-    std::cout << "création du chemin suivi par le robot\n";
-    std::cerr << "[DWA_traj] Initial obstacles configured\n";
+  std::cout << "création du chemin suivi par le robot\n";
+  std::cerr << "[DWA_traj] Initial obstacles configured\n";
 
-    // ========== Initial Goal Configuration ==========
-    // On met le but à l'opposé pour traverser le champ de mines
-    Vector2Df initial_goal;
-    trajectory->SetEnd(initial_goal);
-    std::cerr << "[DWA_traj] Initial goal set to (" << initial_goal.x 
+  // ========== Initial Goal Configuration ==========
+  // On met le but à l'opposé pour traverser le champ de mines
+  Vector2Df initial_goal;
+  trajectory->SetEnd(initial_goal);
+  std::cerr << "[DWA_traj] Initial goal set to (" << initial_goal.x 
               << ", " << initial_goal.y << ")\n";
     
-    // ========== INJECTION DES OBSTACLES DWA ==========
-    trajectory->ClearObstacles();
-    // =================================================
+  // ========== INJECTION DES OBSTACLES DWA ==========
+  trajectory->ClearObstacles();
+  // =================================================
 
-    ugvVrpn->xPlot()->AddCurve(trajectory->GetMatrix()->Element(0,0), DataPlot::Blue);
-    ugvVrpn->yPlot()->AddCurve(trajectory->GetMatrix()->Element(0,1), DataPlot::Blue);
-    ugvVrpn->VxPlot()->AddCurve(trajectory->GetMatrix()->Element(1,0), DataPlot::Blue);
-    ugvVrpn->VyPlot()->AddCurve(trajectory->GetMatrix()->Element(1,1), DataPlot::Blue);
-    ugvVrpn->XyPlot()->AddCurve(trajectory->GetMatrix()->Element(0,1), trajectory->GetMatrix()->Element(0,0), DataPlot::Blue, "test_DWA");
+  ugvVrpn->xPlot()->AddCurve(trajectory->GetMatrix()->Element(0,0), DataPlot::Blue);
+  ugvVrpn->yPlot()->AddCurve(trajectory->GetMatrix()->Element(0,1), DataPlot::Blue);
+  ugvVrpn->VxPlot()->AddCurve(trajectory->GetMatrix()->Element(1,0), DataPlot::Blue);
+  ugvVrpn->VyPlot()->AddCurve(trajectory->GetMatrix()->Element(1,1), DataPlot::Blue);
+  ugvVrpn->XyPlot()->AddCurve(trajectory->GetMatrix()->Element(0,1), trajectory->GetMatrix()->Element(0,0), DataPlot::Blue, "test_DWA");
 
-    Tab *lawTab = new Tab(getFrameworkManager()->GetTabWidget(), "control laws");
-    TabWidget *tabWidget = new TabWidget(lawTab->NewRow(), "laws");
-    Tab *setupLawTab = new Tab(tabWidget, "Setup");
-    Tab *graphLawTab = new Tab(tabWidget, "Graphes");
-    uX = new Pid(setupLawTab->At(1,0), "u_x");
-    uX->UseDefaultPlot(graphLawTab->NewRow());
-    uY = new Pid(setupLawTab->At(1,1), "u_y");
-    uY->UseDefaultPlot(graphLawTab->LastRowLastCol());
+  Tab *lawTab = new Tab(getFrameworkManager()->GetTabWidget(), "control laws");
+  TabWidget *tabWidget = new TabWidget(lawTab->NewRow(), "laws");
+  Tab *setupLawTab = new Tab(tabWidget, "Setup");
+  Tab *graphLawTab = new Tab(tabWidget, "Graphes");
+  uX = new Pid(setupLawTab->At(1,0), "u_x");
+  uX->UseDefaultPlot(graphLawTab->NewRow());
+  uY = new Pid(setupLawTab->At(1,1), "u_y");
+  uY->UseDefaultPlot(graphLawTab->LastRowLastCol());
     
-    getFrameworkManager()->AddDeviceToLog(uX);
-    getFrameworkManager()->AddDeviceToLog(uY);
+  getFrameworkManager()->AddDeviceToLog(uX);
+  getFrameworkManager()->AddDeviceToLog(uY);
 
-    l = new DoubleSpinBox(setupLawTab->NewRow(), "L", " m", 0, 10, 0.1, 1, 1);
-    std::cerr << "[DWA_traj] Initialization complete\n";
+  l = new DoubleSpinBox(setupLawTab->NewRow(), "L", " m", 0, 10, 0.1, 1, 1);
+  std::cerr << "[DWA_traj] Initialization complete\n";
 
-    // Setup UDP pour le simulateur (port 9005)
-    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0) {
-        perror("socket creation failed");
-    }
-    memset(&gc_addr, 0, sizeof(gc_addr));
-    gc_addr.sin_family = AF_INET;
-    gc_addr.sin_port = htons(9005);
-    gc_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    
-    // Setup UDP pour Python (port 9006)
-    memset(&python_addr, 0, sizeof(python_addr));
-    python_addr.sin_family = AF_INET;
-    python_addr.sin_port = htons(9006);
-    python_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+  // Setup UDP pour le simulateur (port 9005)
+  sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+  if (sockfd < 0) {
+    perror("socket creation failed");
+  }
+  memset(&gc_addr, 0, sizeof(gc_addr));
+  gc_addr.sin_family = AF_INET;
+  gc_addr.sin_port = htons(9005);
+  gc_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+  // Setup UDP pour Python (port 9006)
+  memset(&python_addr, 0, sizeof(python_addr));
+  python_addr.sin_family = AF_INET;
+  python_addr.sin_port = htons(9006);
+  python_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+  
+  obstacles_initialized = false;  // Les obstacles ne sont pas encore initialisés
+  init_send_counter = 0;  // Initialiser le compteur
 }
 
 dwatraj::~dwatraj() {
@@ -163,9 +166,8 @@ void dwatraj::InitializeObstacles(int nb_obs) {
         std::cerr << "[DWA_traj] Created VRPN tracker: " << obs_name.str() << "\n";
     }
     
+    obstacles_initialized = true;  // Marquer les obstacles comme initialisés
     std::cerr << "[DWA_traj] Initialized " << nb_obs << " obstacle trackers\n";
-    std::cerr << "[DWA_traj] UDP will send nb_obstacles=" << nb_obs 
-              << " to simulator in next Run() cycle\n";
 }
 
 void dwatraj::Run(void) {
@@ -180,11 +182,33 @@ void dwatraj::Run(void) {
         SecurityCheck();
         CheckJoystick();
         CheckPushButton();
+        
+        // Envoyer INIT périodiquement jusqu'à ce que les obstacles soient initialisés
+        // Mais seulement toutes les 50 itérations (1 fois par seconde) pour éviter le spam
+        if (!obstacles_initialized) {
+            init_send_counter++;
+            if (init_send_counter >= 50) {  // 50 * 20ms = 1 seconde
+                init_send_counter = 0;
+                int nb_obs = trajectory->GetNumberOfObstacles();
+                std::stringstream init_ss;
+                init_ss << "INIT," << nb_obs;
+                std::string init_msg = init_ss.str();
+                sendto(sockfd, init_msg.c_str(), init_msg.length(), 0, 
+                       (const struct sockaddr *)&gc_addr, sizeof(gc_addr));
+            }
+        }
        
         if(behaviourMode == BehaviourMode_t::Manual) ComputeManualControls();
         if(behaviourMode == BehaviourMode_t::Auto) ComputeAutoControls();
 
-        // --- TELEMETRY (Always send) ---
+        // --- TELEMETRY (Send only after obstacles initialized) ---
+        // Ne pas envoyer de télémétrie avant l'initialisation des obstacles
+        // pour éviter les segfaults
+        if (!obstacles_initialized) {
+            WaitPeriod();
+            continue;
+        }
+        
         // Vérifier que ugvVrpn est tracké avant d'accéder aux données
         if (!ugvVrpn->IsTracked(100)) {
             WaitPeriod();
@@ -204,6 +228,11 @@ void dwatraj::Run(void) {
         ugvVrpn->GetQuaternion(t_vrpnQuaternion);
         float t_yaw = t_vrpnQuaternion.ToEuler().yaw;
 
+        // Mettre à jour la position finale depuis les valeurs GUI
+        Vector2Df new_goal(trajectory->GetFinalPositionX(), 
+                   trajectory->GetFinalPositionY());
+        trajectory->SetEnd(new_goal);
+        
         trajectory->GetEnd(t_goal_pos);
         int nb_obs_ctrl = trajectory->GetNumberOfObstacles();
         

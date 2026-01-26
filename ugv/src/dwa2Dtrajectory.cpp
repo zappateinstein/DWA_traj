@@ -100,6 +100,14 @@ void dwa2Dtrajectory::Update(Time time) {
     ProcessUpdate(pimpl_->output);
 }
 
+float dwa2Dtrajectory::GetFinalPositionX() const {
+    return pimpl_->finalpositionx->Value();
+}
+
+float dwa2Dtrajectory::GetFinalPositionY() const {
+    return pimpl_->finalpositiony->Value();
+}
+
 Matrix *dwa2Dtrajectory::GetMatrix(void) const {
     return pimpl_->output;
 }

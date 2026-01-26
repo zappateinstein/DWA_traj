@@ -83,34 +83,54 @@ void udpReceiverThread(int udp_port) {
     
     char buffer[1024];
     while (true) {
-        memset(buffer, 0, sizeof(buffer));
-        int n = recvfrom(sockfd, buffer, sizeof(buffer) - 1, 0, nullptr, nullptr);
+      memset(buffer, 0, sizeof(buffer));
+      int n = recvfrom(sockfd, buffer, sizeof(buffer) - 1, 0, nullptr, nullptr);
         
-        if (n > 0) {
-            buffer[n] = '\0';
-            std::string msg(buffer);
-            
-            // Parser le message: "DWA,timestamp,ugv_x,ugv_y,ugv_yaw,ugv_vx,ugv_vy,target_x,target_y,obs_count,..."
-            if (msg.substr(0, 3) == "DWA") {
-                std::istringstream ss(msg);
-                std::string token;
-                int field_index = 0;
-                
-                while (std::getline(ss, token, ',')) {
-                    if (field_index == 9) {  // obs_count est le 10ème champ (index 9)
-                        int received_nb_obs = std::stoi(token);
-                        if (nb_obs.load() != received_nb_obs) {
-                            nb_obs.store(received_nb_obs);
-                            nb_obs_received.store(true);
-                            need_recreate_obstacles.store(true);  // Demander la recréation
-                            std::cerr << "[Simulator] Received nb_obstacles=" << received_nb_obs << " from UGV\n";
-                        }
-                        break;
-                    }
-                    field_index++;
-                }
+      if (n > 0) {
+        buffer[n] = '\0';
+        std::string msg(buffer);
+    
+        // ========== NOUVEAU : Parser message INIT ==========
+        if (msg.substr(0, 4) == "INIT") {
+          std::istringstream ss(msg);
+          std::string header;
+          std::getline(ss, header, ',');  // Skip "INIT"
+        
+          std::string nb_str;
+          if (std::getline(ss, nb_str, ',')) {
+            int received_nb_obs = std::stoi(nb_str);
+            if (!nb_obs_received.load()) {
+              nb_obs.store(received_nb_obs);
+              nb_obs_received.store(true);
+              std::cerr << "[Simulator] Received INIT nb_obstacles=" 
+                        << received_nb_obs << " from UGV\n";
             }
+          }
         }
+        // ===================================================
+        
+        // Parser le message de télémétrie DWA (reste inchangé)
+        else if (msg.substr(0, 3) == "DWA") {
+          std::istringstream ss(msg);
+          std::string token;
+          int field_index = 0;
+          
+          while (std::getline(ss, token, ',')) {
+            if (field_index == 9) {
+              int received_nb_obs = std::stoi(token);
+              if (nb_obs.load() != received_nb_obs) {
+                nb_obs.store(received_nb_obs);
+                nb_obs_received.store(true);
+                need_recreate_obstacles.store(true);
+                std::cerr << "[Simulator] Received nb_obstacles=" 
+                          << received_nb_obs << " from UGV\n";
+              }
+              break;
+            }
+            field_index++;
+          }
+        }
+      }
         
         usleep(10000);  // 10ms sleep pour éviter de saturer le CPU
     }
@@ -177,21 +197,29 @@ int main(int argc, char* argv[]) {
   std::thread udpThread(udpReceiverThread, 9005);
   udpThread.detach();  // Détacher pour qu'il s'exécute en arrière-plan
   
-  std::cerr << "[Simulator] Launching with support for up to 10 obstacles.\n";
-  std::cerr << "[Simulator] UGV will control how many are visible via UDP.\n";
+  std::cerr << "[Simulator] Waiting for nb_obstacles from UGV (max 60 seconds)...\n";
+  
+  // Attendre jusqu'à 60 secondes pour recevoir nb_obstacles
+  int wait_count = 0;
+  while (!nb_obs_received.load() && wait_count < 600) {  // 600 * 100ms = 60 secondes
+    usleep(100000);  // 100ms
+    wait_count++;
+  }
+
+  int desired_nb_obs = nb_obs.load();
+  std::cerr << "[Simulator] Creating " << desired_nb_obs << " obstacles\n";
 
 #ifdef GL
   gui->setVisualizationCamera(robot);
   
-  // Créer 10 obstacles maximum (ils seront positionnés par l'UGV via VRPN)
-  int max_obstacles = 10;
-  for(int i = 0; i < max_obstacles; i++) {
+  // Créer SEULEMENT le nombre d'obstacles reçu de l'UGV
+  for(int i = 0; i < desired_nb_obs; i++) {
       std::stringstream ss;
       ss << "obs_" << i;
       new Ball(ss.str(), 10 + i);
   }
   
-  std::cerr << "[Simulator] Created " << max_obstacles << " obstacle slots\n";
+  std::cerr << "[Simulator] Created " << desired_nb_obs << " obstacle(s)\n";
 #endif
   
   simu->RunSimu();

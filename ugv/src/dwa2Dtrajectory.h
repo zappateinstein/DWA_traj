@@ -127,6 +127,8 @@ public:
     bool IsRunning(void) const;
 
     int GetNumberOfObstacles() const;
+    float GetFinalPositionX() const;
+    float GetFinalPositionY() const;
 
 
 private:

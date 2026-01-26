@@ -91,6 +91,8 @@ public:
 
     // ========== UI WIDGET PUBLIC ==========
     flair::gui::DoubleSpinBox *nb_obstacles;    // nombre d'obstacles
+    flair::gui::DoubleSpinBox *finalpositionx; // position finale x
+    flair::gui::DoubleSpinBox *finalpositiony; // position finale y
 
 private:
     // ========== MÉTHODES DWA ==========
@@ -138,8 +140,6 @@ private:
     flair::gui::DoubleSpinBox *beta;      // poids vitesse
     flair::gui::DoubleSpinBox *gamma;     // poids obstacle
     flair::gui::DoubleSpinBox *epsilon;   // seuil collision
-    flair::gui::DoubleSpinBox *finalpositionx; // position finale x
-    flair::gui::DoubleSpinBox *finalpositiony; // position finale y
 };
 
 #endif // DWA2DTRAJECTORY_IMPL_H
