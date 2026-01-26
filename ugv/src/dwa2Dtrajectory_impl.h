@@ -88,6 +88,10 @@ public:
         float dw;         // incrément vitesse angulaire
         float sim_time;   // temps total de simulation
     } params;
+
+    // ========== UI WIDGET PUBLIC ==========
+    flair::gui::DoubleSpinBox *nb_obstacles;    // nombre d'obstacles
+
 private:
     // ========== MÉTHODES DWA ==========
     

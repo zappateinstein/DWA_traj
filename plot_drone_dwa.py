@@ -5,7 +5,7 @@ from matplotlib.animation import FuncAnimation
 
 # --- CONFIGURATION RESEAU ---
 UDP_IP = "127.0.0.1"
-UDP_PORT = 9005
+UDP_PORT = 9006  # Port différent du simulateur (qui utilise 9005)
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((UDP_IP, UDP_PORT))

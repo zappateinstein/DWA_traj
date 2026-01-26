@@ -126,6 +126,8 @@ public:
      */
     bool IsRunning(void) const;
 
+    int GetNumberOfObstacles() const;
+
 
 private:
     void UpdateFrom(const core::io_data *data) override {}

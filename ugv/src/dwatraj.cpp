@@ -41,6 +41,7 @@
 #include <unistd.h>
 #include <sstream>
 #include <cstring>
+#include <string>
 
 using namespace std;
 using namespace flair::core;
@@ -56,9 +57,6 @@ using namespace flair::actuator;
 float obs_coords_ctrl[][2] = {
     {-4.2f, -3.8f}
 };
-// Nombre d'obstacles
-int nb_obs_ctrl = 1;
-// =========================================================
 
 dwatraj::dwatraj(string name, TargetController *controller): Thread(getFrameworkManager(), "DWA_Controller", 50), behaviourMode(BehaviourMode_t::Manual), vrpnLost(false) {
     this->controller = controller;
@@ -68,6 +66,9 @@ dwatraj::dwatraj(string name, TargetController *controller): Thread(getFramework
     ugv->UseDefaultPlot();
     
     VrpnClient* vrpnclient = new VrpnClient("vrpn", ugv->GetDefaultVrpnAddress(), 80);
+    trajectory = new dwa2Dtrajectory(vrpnclient->GetLayout()->NewRow(), "Kinematic");
+    
+    // Créer les objets VRPN AVANT de les logger
     ugvVrpn = new MetaVrpnObject(name);
     targetVrpn = new MetaVrpnObject("target");
     
@@ -82,8 +83,8 @@ dwatraj::dwatraj(string name, TargetController *controller): Thread(getFramework
     stopTraj = new PushButton(buttonslayout->LastRowLastCol(), "stop_traj");
     startLog = new PushButton(buttonslayout->NewRow(), "start_log");
     stopLog = new PushButton(buttonslayout->LastRowLastCol(), "stop_log");
-    
-    trajectory = new dwa2Dtrajectory(vrpnclient->GetLayout()->NewRow(), "Kinematic");
+    Obstacles = new PushButton(buttonslayout->NewRow(), "init_obstacles");
+
     std::cout << "création du chemin suivi par le robot\n";
     std::cerr << "[DWA_traj] Initial obstacles configured\n";
 
@@ -96,16 +97,6 @@ dwatraj::dwatraj(string name, TargetController *controller): Thread(getFramework
     
     // ========== INJECTION DES OBSTACLES DWA ==========
     trajectory->ClearObstacles();
-    
-    for(int i = 0; i < nb_obs_ctrl; i++) {
-        float x = obs_coords_ctrl[i][0];
-        float y = obs_coords_ctrl[i][1];
-        
-        // Ajout avec un rayon de sécurité de 0.4m (Ball = 0.3 + Marge)
-        trajectory->AddObstacle(x, y, 0.1f);
-        
-        std::cerr << " [DWA] Obstacle ajouté: (" << x << ", " << y << ")\n";
-    }
     // =================================================
 
     ugvVrpn->xPlot()->AddCurve(trajectory->GetMatrix()->Element(0,0), DataPlot::Blue);
@@ -129,7 +120,7 @@ dwatraj::dwatraj(string name, TargetController *controller): Thread(getFramework
     l = new DoubleSpinBox(setupLawTab->NewRow(), "L", " m", 0, 10, 0.1, 1, 1);
     std::cerr << "[DWA_traj] Initialization complete\n";
 
-    // Setup UDP
+    // Setup UDP pour le simulateur (port 9005)
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd < 0) {
         perror("socket creation failed");
@@ -138,12 +129,43 @@ dwatraj::dwatraj(string name, TargetController *controller): Thread(getFramework
     gc_addr.sin_family = AF_INET;
     gc_addr.sin_port = htons(9005);
     gc_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    
+    // Setup UDP pour Python (port 9006)
+    memset(&python_addr, 0, sizeof(python_addr));
+    python_addr.sin_family = AF_INET;
+    python_addr.sin_port = htons(9006);
+    python_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 }
 
 dwatraj::~dwatraj() {
     if (sockfd >= 0) {
         close(sockfd);
     }
+}
+
+void dwatraj::InitializeObstacles(int nb_obs) {
+    // Nettoyer les anciens obstacles VRPN
+    for (auto obs : obstaclesVrpn) {
+        delete obs;  // Libérer la mémoire
+    }
+    obstaclesVrpn.clear();
+    
+    // Nettoyer les obstacles du DWA
+    trajectory->ClearObstacles();
+    
+    // Créer les nouveaux MetaVrpnObject
+    for (int i = 0; i < nb_obs; i++) {
+        std::ostringstream obs_name;
+        obs_name << "obs_" << i;
+        MetaVrpnObject* obstacleVrpn = new MetaVrpnObject(obs_name.str());
+        obstaclesVrpn.push_back(obstacleVrpn);
+        
+        std::cerr << "[DWA_traj] Created VRPN tracker: " << obs_name.str() << "\n";
+    }
+    
+    std::cerr << "[DWA_traj] Initialized " << nb_obs << " obstacle trackers\n";
+    std::cerr << "[DWA_traj] UDP will send nb_obstacles=" << nb_obs 
+              << " to simulator in next Run() cycle\n";
 }
 
 void dwatraj::Run(void) {
@@ -163,6 +185,12 @@ void dwatraj::Run(void) {
         if(behaviourMode == BehaviourMode_t::Auto) ComputeAutoControls();
 
         // --- TELEMETRY (Always send) ---
+        // Vérifier que ugvVrpn est tracké avant d'accéder aux données
+        if (!ugvVrpn->IsTracked(100)) {
+            WaitPeriod();
+            continue;  // Attendre le prochain cycle
+        }
+        
         Vector3Df t_ugv_pos, t_ugv_vel;
         Vector2Df t_ugv_2Dpos, t_ugv_2Dvel;
         Vector2Df t_goal_pos;
@@ -177,6 +205,7 @@ void dwatraj::Run(void) {
         float t_yaw = t_vrpnQuaternion.ToEuler().yaw;
 
         trajectory->GetEnd(t_goal_pos);
+        int nb_obs_ctrl = trajectory->GetNumberOfObstacles();
         
         std::stringstream ss;
         // DWA,timestamp,ugv_x,ugv_y,ugv_yaw,ugv_vx,ugv_vy,target_x,target_y,obs_count,[obs_x,obs_y,obs_r...]
@@ -185,13 +214,26 @@ void dwatraj::Run(void) {
         ss << t_ugv_2Dvel.x << "," << t_ugv_2Dvel.y << ",";
         ss << t_goal_pos.x << "," << t_goal_pos.y << ",";
         
-        ss << nb_obs_ctrl;
-        for(int i=0; i<nb_obs_ctrl; i++) {
-            ss << "," << obs_coords_ctrl[i][0] << "," << obs_coords_ctrl[i][1] << "," << 0.1;
+        // Envoyer le nombre d'obstacles réellement initialisés (pas celui du GUI)
+        int actual_nb_obs = obstaclesVrpn.size();
+        ss << actual_nb_obs;
+        
+        // Ajouter les positions des obstacles seulement s'ils existent
+        for(int i = 0; i < actual_nb_obs; i++) {
+          Vector3Df obs;
+          Vector2Df obs2D;
+          obstaclesVrpn[i]->GetPosition(obs);
+          obs.To2Dxy(obs2D);
+          ss << "," << obs2D.x << "," << obs2D.y << "," << 0.1;
         }
 
         std::string msg = ss.str();
+        
+        // Envoyer au simulateur (port 9005)
         sendto(sockfd, msg.c_str(), msg.length(), 0, (const struct sockaddr *)&gc_addr, sizeof(gc_addr));
+        
+        // Envoyer au script Python (port 9006)
+        sendto(sockfd, msg.c_str(), msg.length(), 0, (const struct sockaddr *)&python_addr, sizeof(python_addr));
         // --------------------------------
 
         WaitPeriod();
@@ -211,6 +253,13 @@ void dwatraj::CheckPushButton(void) {
       StopTraj(); 
   if (quitProgram->Clicked() == true)
       SafeStop();
+  // NOUVEAU : Gestion du bouton Obstacles
+  if (Obstacles->Clicked() == true) {
+    int nb_obs = trajectory->GetNumberOfObstacles();
+    InitializeObstacles(nb_obs);
+    std::cout << "[DWA_traj] Obstacles button clicked, initialized " 
+              << nb_obs << " obstacles\n";
+  }
 }
 
 // ========== JOYSTICK CHECK ==========
@@ -293,25 +342,39 @@ void dwatraj::ComputeAutoControls(void) {
 
 // ========== START TRAJECTORY ==========
 void dwatraj::StartTraj(void) {
-  if(behaviourMode != BehaviourMode_t::Auto) {
+  if (behaviourMode != BehaviourMode_t::Auto) {
+    // Vérifier qu'on a des obstacles initialisés
+    int nb_obs = obstaclesVrpn.size();
+        
+    if (nb_obs == 0) {
+      std::cerr << "[DWA_traj] WARNING: No obstacles initialized! "
+                << "Click 'init_obstacles' first.\n";
+    }
+        
+    // Récupérer les positions des obstacles via VRPN et les ajouter au DWA
+    trajectory->ClearObstacles();  // Au cas où
+        
+    for (int i = 0; i < nb_obs; i++) {
+      Vector3Df obs;
+      Vector2Df obs2D;
+      obstaclesVrpn[i]->GetPosition(obs);
+      obs.To2Dxy(obs2D);
+            
+      trajectory->AddObstacle(obs2D.x, obs2D.y, 0.1f);
+      std::cerr << "[DWA_traj] Obstacle " << i << " at (" 
+                << obs2D.x << ", " << obs2D.y << ")\n";
+    }
+        
+    // Démarrer la trajectoire depuis la position actuelle du robot
     Vector3Df ugv_pos;
     Vector2Df ugv_2Dpos;
-
     ugvVrpn->GetPosition(ugv_pos);
-     std::cerr << "[DEBUG] VRPN 3D pos: (" << ugv_pos.x << ", " 
-          << ugv_pos.y << ", " << ugv_pos.z << ")\n";
     ugv_pos.To2Dxy(ugv_2Dpos);
-    std::cerr << "[DEBUG] VRPN 2D pos: (" << ugv_2Dpos.x << ", " 
-          << ugv_2Dpos.y << ")\n";
-    
-    // Position de départ (ex: -5, -5)
-    // Goal déjà configuré dans le constructeur (5, 5) ou réinitialisez-le ici
+        
     trajectory->StartTraj(ugv_2Dpos);
-
-    uX->Reset();
-    uY->Reset();
     behaviourMode = BehaviourMode_t::Auto;
-    Thread::Info("DWA Controller: Starting Auto Mode\n");
+        
+    std::cerr << "[DWA_traj] Trajectory started with " << nb_obs << " obstacles\n";
   }
 }
 

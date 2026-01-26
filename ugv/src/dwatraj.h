@@ -49,11 +49,13 @@ class dwatraj : public flair::core::Thread {
         void SecurityCheck(void);
         void CheckJoystick(void);
         void CheckPushButton(void);
+        void InitializeObstacles(int nb_obs);  // Nouvelle méthode
 
         flair::filter::Pid *uX, *uY;
-        flair::gui::PushButton *startTraj, *stopTraj, *quitProgram, *startLog, *stopLog;
+        flair::gui::PushButton *startTraj, *stopTraj, *quitProgram, *startLog, *stopLog, *Obstacles;
         flair::gui::DoubleSpinBox *l;
-        flair::meta::MetaVrpnObject *targetVrpn, *ugvVrpn, *obstacleVrpn;
+        flair::meta::MetaVrpnObject *targetVrpn, *ugvVrpn;
+        std::vector<flair::meta::MetaVrpnObject *> obstaclesVrpn;
         flair::filter::dwa2Dtrajectory *trajectory;
         BehaviourMode_t behaviourMode;
         bool vrpnLost;
@@ -61,6 +63,7 @@ class dwatraj : public flair::core::Thread {
 
         int sockfd;
         struct sockaddr_in gc_addr;
+        struct sockaddr_in python_addr;  // Pour le script Python
 };
 
 #endif // DWATRAJ_H

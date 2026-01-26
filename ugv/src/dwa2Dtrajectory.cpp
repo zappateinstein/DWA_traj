@@ -89,6 +89,10 @@ void dwa2Dtrajectory::GetJerk(Vector2Df &point) const {
     pimpl_->GetJerk(point);
 }
 
+int dwa2Dtrajectory::GetNumberOfObstacles() const {
+    return static_cast<int>(pimpl_->nb_obstacles->Value());
+}
+
 // ========== UPDATE & STATE ==========
 
 void dwa2Dtrajectory::Update(Time time) {
