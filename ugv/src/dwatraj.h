@@ -60,6 +60,8 @@ class dwatraj : public flair::core::Thread {
         BehaviourMode_t behaviourMode;
         bool vrpnLost;
         flair::sensor::TargetController *controller;
+        bool mission_ended;
+        double mission_time;  // Temps de mission en secondes
 
         int sockfd;
         struct sockaddr_in gc_addr;

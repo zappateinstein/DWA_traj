@@ -44,6 +44,7 @@ public:
     ~dwa2Dtrajectory_impl();
 
     void Update(flair::core::Time time);
+    void SetCurrentPosition(const flair::core::Vector2Df &current_pos, float current_yaw);
     void StartTraj(const flair::core::Vector2Df &start_pos);
     void FinishTraj(void);
     void StopTraj(void);
@@ -73,6 +74,7 @@ public:
     void SetEnd(const flair::core::Vector2Df &e);
     void SetEndSpeed(const flair::core::Vector2Df &vs);
     void GetEnd(flair::core::Vector2Df &p) const;
+    void GetCurrentTime(float &t) const;   
 
     // Paramètres DWA exposés
     struct DWAParams {
@@ -114,6 +116,7 @@ private:
     
     // Avance le robot d'un pas de temps
     void RobotMotion(float &px, float &py, float &theta, float v, float w, float dt);
+     
 
     // ========== TIMING ==========
     flair::core::Time previous_time;
@@ -124,6 +127,7 @@ private:
     // ========== ÉTAT CINÉMATIQUE ==========
     flair::core::Vector2Df pos;      // position actuelle (x, y)
     flair::core::Vector2Df vel;      // vitesse actuelle (vx, vy)
+    float w_current;                 // vitesse angulaire actuelle (rad/s)
     flair::core::Vector2Df acc;
     flair::core::Vector2Df jerk;
     flair::core::Vector2Df end_speed;

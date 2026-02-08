@@ -100,12 +100,22 @@ void dwa2Dtrajectory::Update(Time time) {
     ProcessUpdate(pimpl_->output);
 }
 
+void dwa2Dtrajectory::SetCurrentPosition(const Vector2Df &current_pos, float current_yaw) {
+    pimpl_->SetCurrentPosition(current_pos, current_yaw);
+}
+
 float dwa2Dtrajectory::GetFinalPositionX() const {
     return pimpl_->finalpositionx->Value();
 }
 
 float dwa2Dtrajectory::GetFinalPositionY() const {
     return pimpl_->finalpositiony->Value();
+}
+
+float dwa2Dtrajectory::GetCurrentTime() const {
+    float time;
+    pimpl_->GetCurrentTime(time);
+    return time;
 }
 
 Matrix *dwa2Dtrajectory::GetMatrix(void) const {

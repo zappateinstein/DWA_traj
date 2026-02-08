@@ -58,7 +58,15 @@ float obs_coords_ctrl[][2] = {
     {-4.2f, -3.8f}
 };
 
-dwatraj::dwatraj(string name, TargetController *controller): Thread(getFrameworkManager(), "DWA_Controller", 50), behaviourMode(BehaviourMode_t::Manual), vrpnLost(false) {
+dwatraj::dwatraj(string name, TargetController *controller)
+    : Thread(getFrameworkManager(), "DWA_Controller", 50), 
+      behaviourMode(BehaviourMode_t::Manual), 
+      vrpnLost(false),
+      obstacles_initialized(false),
+      init_send_counter(0),
+      mission_ended(false),  // CRITIQUE: Initialiser AVANT toute utilisation
+      mission_time(0.0)      // Initialiser le compteur de temps
+{
   this->controller = controller;
   controller->Start();
     
@@ -89,7 +97,6 @@ dwatraj::dwatraj(string name, TargetController *controller): Thread(getFramework
   std::cerr << "[DWA_traj] Initial obstacles configured\n";
 
   // ========== Initial Goal Configuration ==========
-  // On met le but à l'opposé pour traverser le champ de mines
   Vector2Df initial_goal;
   trajectory->SetEnd(initial_goal);
   std::cerr << "[DWA_traj] Initial goal set to (" << initial_goal.x 
@@ -97,7 +104,6 @@ dwatraj::dwatraj(string name, TargetController *controller): Thread(getFramework
     
   // ========== INJECTION DES OBSTACLES DWA ==========
   trajectory->ClearObstacles();
-  // =================================================
 
   ugvVrpn->xPlot()->AddCurve(trajectory->GetMatrix()->Element(0,0), DataPlot::Blue);
   ugvVrpn->yPlot()->AddCurve(trajectory->GetMatrix()->Element(0,1), DataPlot::Blue);
@@ -118,7 +124,6 @@ dwatraj::dwatraj(string name, TargetController *controller): Thread(getFramework
   getFrameworkManager()->AddDeviceToLog(uY);
 
   l = new DoubleSpinBox(setupLawTab->NewRow(), "L", " m", 0, 10, 0.1, 1, 1);
-  std::cerr << "[DWA_traj] Initialization complete\n";
 
   // Setup UDP pour le simulateur (port 9005)
   sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -136,8 +141,7 @@ dwatraj::dwatraj(string name, TargetController *controller): Thread(getFramework
   python_addr.sin_port = htons(9006);
   python_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
   
-  obstacles_initialized = false;  // Les obstacles ne sont pas encore initialisés
-  init_send_counter = 0;  // Initialiser le compteur
+  std::cerr << "[DWA_traj] Initialization complete - mission_ended = " << mission_ended << "\n";
 }
 
 dwatraj::~dwatraj() {
@@ -147,9 +151,11 @@ dwatraj::~dwatraj() {
 }
 
 void dwatraj::InitializeObstacles(int nb_obs) {
+    std::cerr << "[DWA_traj] Initializing " << nb_obs << " obstacle trackers\n";
+    
     // Nettoyer les anciens obstacles VRPN
     for (auto obs : obstaclesVrpn) {
-        delete obs;  // Libérer la mémoire
+        delete obs;
     }
     obstaclesVrpn.clear();
     
@@ -163,10 +169,13 @@ void dwatraj::InitializeObstacles(int nb_obs) {
         MetaVrpnObject* obstacleVrpn = new MetaVrpnObject(obs_name.str());
         obstaclesVrpn.push_back(obstacleVrpn);
         
-        std::cerr << "[DWA_traj] Created VRPN tracker: " << obs_name.str() << "\n";
+        float radius = 0.1f;
+        
+        std::cerr << "[DWA_traj] Created VRPN tracker: " << obs_name.str() 
+                  << " with radius: " << radius << " m\n";
     }
     
-    obstacles_initialized = true;  // Marquer les obstacles comme initialisés
+    obstacles_initialized = true;
     std::cerr << "[DWA_traj] Initialized " << nb_obs << " obstacle trackers\n";
 }
 
@@ -184,10 +193,9 @@ void dwatraj::Run(void) {
         CheckPushButton();
         
         // Envoyer INIT périodiquement jusqu'à ce que les obstacles soient initialisés
-        // Mais seulement toutes les 50 itérations (1 fois par seconde) pour éviter le spam
         if (!obstacles_initialized) {
             init_send_counter++;
-            if (init_send_counter >= 50) {  // 50 * 20ms = 1 seconde
+            if (init_send_counter >= 50) {
                 init_send_counter = 0;
                 int nb_obs = trajectory->GetNumberOfObstacles();
                 std::stringstream init_ss;
@@ -201,18 +209,15 @@ void dwatraj::Run(void) {
         if(behaviourMode == BehaviourMode_t::Manual) ComputeManualControls();
         if(behaviourMode == BehaviourMode_t::Auto) ComputeAutoControls();
 
-        // --- TELEMETRY (Send only after obstacles initialized) ---
-        // Ne pas envoyer de télémétrie avant l'initialisation des obstacles
-        // pour éviter les segfaults
+        // --- TELEMETRY ---
         if (!obstacles_initialized) {
             WaitPeriod();
             continue;
         }
         
-        // Vérifier que ugvVrpn est tracké avant d'accéder aux données
         if (!ugvVrpn->IsTracked(100)) {
             WaitPeriod();
-            continue;  // Attendre le prochain cycle
+            continue;
         }
         
         Vector3Df t_ugv_pos, t_ugv_vel;
@@ -228,48 +233,44 @@ void dwatraj::Run(void) {
         ugvVrpn->GetQuaternion(t_vrpnQuaternion);
         float t_yaw = t_vrpnQuaternion.ToEuler().yaw;
 
-        // Mettre à jour la position finale depuis les valeurs GUI
         Vector2Df new_goal(trajectory->GetFinalPositionX(), 
                    trajectory->GetFinalPositionY());
         trajectory->SetEnd(new_goal);
         
         trajectory->GetEnd(t_goal_pos);
-        int nb_obs_ctrl = trajectory->GetNumberOfObstacles();
+        
+        // Récupérer le temps de mission depuis la trajectoire
+        mission_time = trajectory->GetCurrentTime();
         
         std::stringstream ss;
-        // DWA,timestamp,ugv_x,ugv_y,ugv_yaw,ugv_vx,ugv_vy,target_x,target_y,obs_count,[obs_x,obs_y,obs_r...]
-        ss << "DWA," << GetTime() / 1000000000.0 << ",";
+        ss << "DWA," << mission_time << ",";
         ss << t_ugv_2Dpos.x << "," << t_ugv_2Dpos.y << "," << t_yaw << ",";
         ss << t_ugv_2Dvel.x << "," << t_ugv_2Dvel.y << ",";
         ss << t_goal_pos.x << "," << t_goal_pos.y << ",";
         
-        // Envoyer le nombre d'obstacles réellement initialisés (pas celui du GUI)
+        // Envoyer le flag mission_ended
+        ss << (mission_ended ? 1 : 0) << ",";
+        
         int actual_nb_obs = obstaclesVrpn.size();
         ss << actual_nb_obs;
         
-        // Ajouter les positions des obstacles seulement s'ils existent
         for(int i = 0; i < actual_nb_obs; i++) {
           Vector3Df obs;
           Vector2Df obs2D;
           obstaclesVrpn[i]->GetPosition(obs);
           obs.To2Dxy(obs2D);
-          ss << "," << obs2D.x << "," << obs2D.y << "," << 0.1;
+          ss << "," << obs2D.x << "," << obs2D.y << "," << 0.1f;
         }
 
         std::string msg = ss.str();
         
-        // Envoyer au simulateur (port 9005)
         sendto(sockfd, msg.c_str(), msg.length(), 0, (const struct sockaddr *)&gc_addr, sizeof(gc_addr));
-        
-        // Envoyer au script Python (port 9006)
         sendto(sockfd, msg.c_str(), msg.length(), 0, (const struct sockaddr *)&python_addr, sizeof(python_addr));
-        // --------------------------------
 
         WaitPeriod();
     }
 }
 
-// ========== BUTTONS CHECK ==========
 void dwatraj::CheckPushButton(void) {
   if (startLog->Clicked() == true)
     getFrameworkManager()->StartLog();
@@ -282,7 +283,6 @@ void dwatraj::CheckPushButton(void) {
       StopTraj(); 
   if (quitProgram->Clicked() == true)
       SafeStop();
-  // NOUVEAU : Gestion du bouton Obstacles
   if (Obstacles->Clicked() == true) {
     int nb_obs = trajectory->GetNumberOfObstacles();
     InitializeObstacles(nb_obs);
@@ -291,7 +291,6 @@ void dwatraj::CheckPushButton(void) {
   }
 }
 
-// ========== JOYSTICK CHECK ==========
 void dwatraj::CheckJoystick(void) {
   if(controller->ButtonClicked(4) && controller->IsButtonPressed(9)) {
       StartTraj();
@@ -301,7 +300,6 @@ void dwatraj::CheckJoystick(void) {
   }
 }
 
-// ========== SECURITY ==========
 void dwatraj::SecurityCheck(void) {
     if ((!vrpnLost) && (behaviourMode == BehaviourMode_t::Auto)) {
         if (!ugvVrpn->IsTracked(500)) {
@@ -312,14 +310,12 @@ void dwatraj::SecurityCheck(void) {
     }
 }
 
-// ========== MANUAL CONTROL ==========
 void dwatraj::ComputeManualControls(void) {
   float speed = -controller->GetAxisValue(3);
   float turn = controller->GetAxisValue(0);
   GetUgv()->GetUgvControls()->SetControls(speed, turn);
 }
 
-// ========== AUTO CONTROL (DWA FOLLOWER) ==========
 void dwatraj::ComputeAutoControls(void) {
   Vector3Df ugv_pos, ugv_vel;
   Vector2Df ugv_2Dpos, ugv_2Dvel;
@@ -333,10 +329,12 @@ void dwatraj::ComputeAutoControls(void) {
   ugv_pos.To2Dxy(ugv_2Dpos);
   ugv_vel.To2Dxy(ugv_2Dvel);
   
-  // Note: On n'a plus besoin de mettre à jour les obstacles ici 
-  // car ils sont statiques et déjà chargés dans le constructeur.
+  // Injecter la position et orientation réelles dans le DWA
+  Quaternion ugv_quat;
+  ugvVrpn->GetQuaternion(ugv_quat);
+  float yaw = ugv_quat.ToEuler().yaw;
+  trajectory->SetCurrentPosition(ugv_2Dpos, yaw);
   
-  // DWA Update
   trajectory->Update(GetTime());
   trajectory->GetPosition(traj_pos);
   trajectory->GetSpeed(traj_vel);
@@ -352,49 +350,51 @@ void dwatraj::ComputeAutoControls(void) {
   
   float real_dist_to_goal = (goal_pos - ugv_2Dpos).GetNorm();
 
+  // Détecter fin de mission quand goal atteint
   if (!trajectory->IsRunning() && real_dist_to_goal < 0.1f) {
-    std::cout << "[DWA_traj] Goal reached (Physics)! Stopping.\n";
+    std::cout << "[DWA_traj] Goal reached! Distance=" << real_dist_to_goal << "m\n";
     GetUgv()->GetUgvControls()->SetControls(0, 0);
     behaviourMode = BehaviourMode_t::Manual;
+    
+    mission_ended = true;
+    std::cerr << "[DWA_traj] *** MISSION ENDED FLAG = TRUE ***\n";
+    
     return;
   }
-
-  Quaternion vrpnQuaternion;
-  ugvVrpn->GetQuaternion(vrpnQuaternion);
-  float yaw = vrpnQuaternion.ToEuler().yaw;
   
   float v = cosf(yaw) * uX->Output() + sinf(yaw) * uY->Output();
   float w = -sinf(yaw) / l->Value() * uX->Output() + cosf(yaw) / l->Value() * uY->Output();
-  std::cerr << "[DWA_traj] position <"<<ugv_2Dpos.x<<","<<ugv_2Dpos.y<<"> "<<"\n";
+  
   GetUgv()->GetUgvControls()->SetControls(-v, -w);
 }
 
-// ========== START TRAJECTORY ==========
 void dwatraj::StartTraj(void) {
   if (behaviourMode != BehaviourMode_t::Auto) {
-    // Vérifier qu'on a des obstacles initialisés
+    // CRITIQUE: Réinitialiser le flag
+    mission_ended = false;
+    mission_time = 0.0;  // Réinitialiser le compteur de temps
+    std::cerr << "[DWA_traj] *** MISSION ENDED FLAG = FALSE (START) ***\n";
+    
     int nb_obs = obstaclesVrpn.size();
         
     if (nb_obs == 0) {
-      std::cerr << "[DWA_traj] WARNING: No obstacles initialized! "
-                << "Click 'init_obstacles' first.\n";
+      std::cerr << "[DWA_traj] WARNING: No obstacles initialized!\n";
     }
         
-    // Récupérer les positions des obstacles via VRPN et les ajouter au DWA
-    trajectory->ClearObstacles();  // Au cas où
+    trajectory->ClearObstacles();
         
     for (int i = 0; i < nb_obs; i++) {
       Vector3Df obs;
       Vector2Df obs2D;
       obstaclesVrpn[i]->GetPosition(obs);
+      float obs_radius = 0.1f;
       obs.To2Dxy(obs2D);
             
-      trajectory->AddObstacle(obs2D.x, obs2D.y, 0.1f);
+      trajectory->AddObstacle(obs2D.x, obs2D.y, obs_radius);
       std::cerr << "[DWA_traj] Obstacle " << i << " at (" 
                 << obs2D.x << ", " << obs2D.y << ")\n";
     }
         
-    // Démarrer la trajectoire depuis la position actuelle du robot
     Vector3Df ugv_pos;
     Vector2Df ugv_2Dpos;
     ugvVrpn->GetPosition(ugv_pos);
@@ -407,12 +407,15 @@ void dwatraj::StartTraj(void) {
   }
 }
 
-// ========== STOP TRAJECTORY ==========
 void dwatraj::StopTraj(void) {
   if(behaviourMode == BehaviourMode_t::Auto) {
     trajectory->FinishTraj(); 
     behaviourMode = BehaviourMode_t::Manual;
     GetUgv()->GetUgvControls()->SetControls(0, 0);
+    
+    mission_ended = true;
+    std::cerr << "[DWA_traj] *** MISSION ENDED FLAG = TRUE (MANUAL STOP) ***\n";
+    
     Thread::Info("DWA Controller: Stopping Auto Mode\n");
   }
 }

@@ -33,9 +33,9 @@ dwa2Dtrajectory_impl::dwa2Dtrajectory_impl(
     alpha = new DoubleSpinBox(reglages_groupbox->NewRow(), "alpha (heading)", "", 0.0, 10.0, 0.1, 1.5);
     beta = new DoubleSpinBox(reglages_groupbox->LastRowLastCol(), "beta (velocity)", "", 0.0, 10.0, 0.1, 1.0);
     gamma = new DoubleSpinBox(reglages_groupbox->LastRowLastCol(), "gamma (obstacle)", "", 0.0, 10.0, 0.1, 1.0);
-    epsilon = new DoubleSpinBox(reglages_groupbox->LastRowLastCol(), "epsilon (collision)", " m", 0.0, 1.0, 0.01, 2, 0.1);  // CORRECTION: 3,0.1 -> 0.1
-    finalpositionx = new DoubleSpinBox (reglages_groupbox->NewRow(), "final position x", " m", 0, 5.0, 0.1);
-    finalpositiony = new DoubleSpinBox (reglages_groupbox->LastRowLastCol(), "final position y", " m", 0, 5.0, 0.1);
+    epsilon = new DoubleSpinBox(reglages_groupbox->LastRowLastCol(), "epsilon (collision)", " m", 0.0, 1.0, 0.01, 2, 0.1);
+    finalpositionx = new DoubleSpinBox (reglages_groupbox->NewRow(), "final position x", " m", -5.0, 5.0, 0.1);
+    finalpositiony = new DoubleSpinBox (reglages_groupbox->LastRowLastCol(), "final position y", " m", -5.0, 5.0, 0.1);
     nb_obstacles = new DoubleSpinBox (reglages_groupbox->LastRowLastCol(), "number of obstacles", "", 0, 30, 1, 1);
     
     // ========== Matrice de sortie (pos, vel, acc, jerk) ==========
@@ -54,6 +54,7 @@ dwa2Dtrajectory_impl::dwa2Dtrajectory_impl(
     // ========== Initialisation de l'état ==========
     pos = Vector2Df(0, 0);
     vel = Vector2Df(0, 0);
+    w_current = 0.0f;
     acc = Vector2Df(0, 0);
     jerk = Vector2Df(0, 0);
     end_speed = Vector2Df(0, 0);
@@ -69,13 +70,13 @@ dwa2Dtrajectory_impl::dwa2Dtrajectory_impl(
     params.v_max = 1.0f;
     params.w_max = 1.0f;
     params.dt = 0.1f;
-    params.T = 1.0f;
+    params.T = 0.9f;
     params.alpha = 1.5f;
     params.beta = 1.0f;
     params.gamma = 1.0f;
     params.epsilon = 0.1f;
-    params.dv = 0.05f;
-    params.dw = 0.05f;
+    params.dv = 0.02f;
+    params.dw = 0.02f;
     params.sim_time = 30.0f;
 
     std::cerr << "[DWA_impl] Initialized successfully\n";
@@ -134,6 +135,10 @@ void dwa2Dtrajectory_impl::GetJerk(Vector2Df &j) const {
     j = jerk; 
 }
 
+void dwa2Dtrajectory_impl::GetCurrentTime(float &t) const {
+    t = CurrentTime;
+}
+
 // ========== CONTRÔLE DE TRAJECTOIRE ==========
 
 void dwa2Dtrajectory_impl::StartTraj(const Vector2Df &start_pos) {
@@ -159,6 +164,11 @@ void dwa2Dtrajectory_impl::StartTraj(const Vector2Df &start_pos) {
     
     std::cerr << "[DWA] Started from (" << pos.x << ", " << pos.y 
               << ") toward goal (" << goal_pos.x << ", " << goal_pos.y << ")\n";
+}
+
+void dwa2Dtrajectory_impl::SetCurrentPosition(const Vector2Df &current_pos, float current_yaw) {
+    pos = current_pos;
+    angle_off = current_yaw;
 }
 
 void dwa2Dtrajectory_impl::FinishTraj(void) {
@@ -226,7 +236,7 @@ float dwa2Dtrajectory_impl::MinimalDistance(const SimulatedTrajectory &traj) {
         for (const auto &obs : obstacles) {
             float dx = px - obs.x;
             float dy = py - obs.y;
-            float dist = sqrtf(dx * dx + dy * dy) - obs.radius;
+            float dist = sqrtf(dx * dx + dy * dy) - (obs.radius+0.15f);
             
             if (dist < min_dist) {
                 min_dist = dist;
@@ -267,13 +277,6 @@ float dwa2Dtrajectory_impl::EvaluateTrajectory(const SimulatedTrajectory &traj,
     float score = params.alpha * heading + 
                   params.beta * velocity_term + 
                   params.gamma * d_min;
-
-    // --- AJOUT OBLIGATOIRE ---
-    float dist_to_goal = (goal_pos - pos).GetNorm();
-    // Si on n'avance pas alors qu'on est loin du but -> PENALITÉ MORTELLE
-    if (v < 0.05f && dist_to_goal > 0.2f) {
-        score -= 1000.0f; 
-    }
     
     return score;
 }
@@ -285,10 +288,28 @@ void dwa2Dtrajectory_impl::CalcVelocityCommand(float &v_cmd, float &w_cmd) {
     v_cmd = 0.0f;
     w_cmd = 0.0f;
     
-    // Start v from dv instead of 0 to force checking moving trajectories
-    // OR allow 0 but ensure scoring favors speed.
-    for (float v = 0.0f; v <= params.v_max; v += params.dv) {
-        for (float w = -params.w_max; w <= params.w_max; w += params.dw) {
+    // ========== FENÊTRE DYNAMIQUE ==========
+    // Vitesse linéaire actuelle
+    float v_current = sqrtf(vel.x * vel.x + vel.y * vel.y);
+    
+    // Accélérations max (valeurs fixes puisque pas de widgets UI)
+    float acc_max = 1.0f;      // m/s²
+    float acc_w_max = 3.14f;    // rad/s²
+    
+    // Fenêtre dynamique pour v (vitesses atteignables)
+    float v_min = std::max(0.0f, v_current - acc_max * params.dt);
+    float v_max_dyn = std::min(params.v_max, v_current + acc_max * params.dt);
+    
+    // Fenêtre dynamique pour w
+    float w_min = std::max(-params.w_max, w_current - acc_w_max * params.dt);
+    float w_max_dyn = std::min(params.w_max, w_current + acc_w_max * params.dt);
+    
+    std::cerr << "[DWA] Dynamic window: v=[" << v_min << ", " << v_max_dyn 
+              << "] w=[" << w_min << ", " << w_max_dyn << "]\n";
+    
+    // Exploration dans la fenêtre dynamique
+    for (float v = v_min; v <= v_max_dyn; v += params.dv) {
+        for (float w = w_min; w <= w_max_dyn; w += params.dw) {
             
             SimulatedTrajectory traj = SimTrajectory(v, w, params.dt, params.T);
             
@@ -329,10 +350,10 @@ void dwa2Dtrajectory_impl::Update(Time time) {
     // ========== Si non actif, publie l'état courant ==========
     if (!is_running) {
         output->GetMutex();
-        output->SetValueNoMutex(0, 0, pos.x + pos_off.x);
-        output->SetValueNoMutex(0, 1, pos.y + pos_off.y);
-        output->SetValueNoMutex(1, 0, vel.x + vel_off.x);
-        output->SetValueNoMutex(1, 1, vel.y + vel_off.y);
+        output->SetValueNoMutex(0, 0, pos.x);
+        output->SetValueNoMutex(0, 1, pos.y);
+        output->SetValueNoMutex(1, 0, vel.x);
+        output->SetValueNoMutex(1, 1, vel.y);
         output->SetValueNoMutex(2, 0, acc.x);
         output->SetValueNoMutex(2, 1, acc.y);
         output->SetValueNoMutex(3, 0, jerk.x);
@@ -361,6 +382,7 @@ void dwa2Dtrajectory_impl::Update(Time time) {
         vel = vel * 0.9f;  // décélération
         is_running = false;
         std::cerr << "[DWA] Goal reached! Distance=" << dist_to_goal << "\n";
+        std::cerr << "[DWA] Mission terminée ! tsim = " << CurrentTime << " s\n";
     } else {
         // ========== Calcul de la commande simple (contrôleur proportionnel) ==========
         // CORRECTION: Calcul de l'angle vers le goal depuis la position ACTUELLE
@@ -370,19 +392,24 @@ void dwa2Dtrajectory_impl::Update(Time time) {
                   << " dist_to_goal=" << dist_to_goal << "\n";
         
         // ========== Mise à jour de l'état du robot ==========
+        // La position (pos) est déjà mise à jour par SetCurrentPosition() appelé depuis dwatraj.cpp
+        // On calcule juste les commandes et les dérivées
+        
         float old_px = pos.x;
         float old_py = pos.y;
         float old_vx = vel.x;
         float old_vy = vel.y;   
         float old_ax = acc.x;
-        float old_ay = acc.y;   
-        
-        // CORRECTION: Utiliser angle_off (orientation actuelle) pas theta_end
-        RobotMotion(pos.x, pos.y, angle_off, v_cmd, w_cmd, delta_t);
+        float old_ay = acc.y;
+        float old_angle = angle_off;
         
         // Mise à jour de la vitesse (dérivée de position)
+        // pos a été mis à jour par SetCurrentPosition(), on calcule vel depuis le changement
         vel.x = (pos.x - old_px) / delta_t;
         vel.y = (pos.y - old_py) / delta_t;
+        
+        // Mise à jour de la vitesse angulaire actuelle
+        w_current = (angle_off - old_angle) / delta_t;
         
         // Mise à jour de l'accélération (dérivée de vitesse)
         acc.x = (vel.x - old_vx) / delta_t;
@@ -397,10 +424,10 @@ void dwa2Dtrajectory_impl::Update(Time time) {
     
     // ========== Publication des sorties ==========
     output->GetMutex();
-    output->SetValueNoMutex(0, 0, pos.x + pos_off.x);  // Position avec offset
-    output->SetValueNoMutex(0, 1, pos.y + pos_off.y);
-    output->SetValueNoMutex(1, 0, vel.x + vel_off.x);  // Vitesse avec offset
-    output->SetValueNoMutex(1, 1, vel.y + vel_off.y);
+    output->SetValueNoMutex(0, 0, pos.x);  // Position avec offset
+    output->SetValueNoMutex(0, 1, pos.y);
+    output->SetValueNoMutex(1, 0, vel.x);  // Vitesse avec offset
+    output->SetValueNoMutex(1, 1, vel.y);
     output->SetValueNoMutex(2, 0, acc.x);
     output->SetValueNoMutex(2, 1, acc.y);
     output->SetValueNoMutex(3, 0, jerk.x);

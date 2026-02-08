@@ -92,9 +92,14 @@ public:
     void SetEndSpeed(const core::Vector2Df &value);
 
     /**
-     * Mise à jour de la trajectoire (appelée périodiquement)
+     * Mise à jour de la trajectoire (à appeler périodiquement)
      */
     void Update(core::Time time);
+    
+    /**
+     * Injecte la position réelle actuelle du robot (depuis VRPN)
+     */
+    void SetCurrentPosition(const core::Vector2Df &current_pos, float current_yaw);
 
     /**
      * Récupère la position actuelle générée
@@ -129,6 +134,7 @@ public:
     int GetNumberOfObstacles() const;
     float GetFinalPositionX() const;
     float GetFinalPositionY() const;
+    float GetCurrentTime() const;
 
 
 private:
